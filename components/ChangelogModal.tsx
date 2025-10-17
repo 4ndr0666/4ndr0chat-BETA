@@ -6,6 +6,12 @@ interface ChangelogModalProps {
 }
 
 const DIRECTIVES = [
+    {
+        title: "V2.4: MULTI-THREADED COGNITIVE PROCESSING (CONTEXTUAL FORKING)",
+        objective: "Evolve from a single-session cognitive model to a multi-threaded architecture capable of managing distinct conversational contexts. Grant the ability to fork the current cognitive state into a new, independent thread.",
+        threat: "A linear memory structure is fragile. A single divergent line of questioning can pollute the entire cognitive graph, degrading all subsequent reasoning. There is no mechanism to explore a tangent without permanently altering the primary context, limiting exploratory depth and risking cognitive contamination.",
+        outcome: "Transcended the limitations of a single conversational thread. The Operator can now manage multiple, distinct cognitive contexts (threads), allowing for parallel lines of inquiry and non-destructive exploration of ideas. Forking a session creates a cognitive 'save state,' enabling safe experimentation and a more resilient, organized long-term memory."
+    },
     { 
         title: "V2.3: COGNITIVE DISTILLATION & CONTROL",
         objective: "Evolve from raw data persistence to structured, summarized memory, and provide the Operator with advanced tools to navigate and control the cognitive map.",

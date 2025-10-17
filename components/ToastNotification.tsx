@@ -1,5 +1,5 @@
 import React from 'react';
-import { SaveIcon, MemoryWipeIcon, DistillIcon } from './IconComponents';
+import { SessionsIcon, TrashIcon, DistillIcon } from './IconComponents';
 
 interface ToastNotificationProps {
   message: string | null;
@@ -12,13 +12,13 @@ const ToastNotification: React.FC<ToastNotificationProps> = ({ message, type = '
   }
 
   const ICONS = {
-    success: SaveIcon,
-    cleared: MemoryWipeIcon,
+    success: SessionsIcon,
+    cleared: TrashIcon,
     info: DistillIcon
   }
 
   const typeClasses = type;
-  const Icon = ICONS[type] || SaveIcon;
+  const Icon = ICONS[type] || SessionsIcon;
 
   return (
     <div className={`toast-notification ${typeClasses}`}>

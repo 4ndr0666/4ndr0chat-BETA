@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Author, ChatMessage as ChatMessageType, UrlContext, FileContext, DisplayPart } from './types';
+import { Author, ChatMessage as ChatMessageType, UrlContext, FileContext, DisplayPart, Session } from './types';
 import { createChatSession, getPromptSuggestions, summarizeConversation } from './services/geminiService';
 import { processMessagesForGraph, CognitiveGraphData, GraphNode } from './services/cognitiveCore';
 import ChatMessage from './components/ChatMessage';
@@ -11,11 +11,12 @@ import ToastNotification from './components/ToastNotification';
 import ChangelogModal from './components/ChangelogModal';
 import ConfirmationModal from './components/ConfirmationModal';
 import { SpinnerIcon, ScrollDownIcon } from './components/IconComponents';
-import type { GenerateContentResponse, Part, Chat } from '@google/genai';
+import type { GenerateContentResponse, Part } from '@google/genai';
 import SplashScreen from './components/SplashScreen';
 import PromptSuggestions from './components/PromptSuggestions';
 import UrlInputModal from './components/UrlInputModal';
 import GraphControls from './components/GraphControls';
+import SessionManager from './components/SessionManager';
 
 declare global {
     interface Window {
@@ -37,15 +38,23 @@ const GREETINGS = [
 
 const getRandomGreeting = () => GREETINGS[Math.floor(Math.random() * GREETINGS.length)];
 
-const INITIAL_MESSAGE: ChatMessageType = {
-  id: 'ai-initial-greeting',
-  author: Author.AI,
-  parts: [{ text: getRandomGreeting() }]
-};
+const createNewSession = (name: string, messages?: ChatMessageType[], graphData?: CognitiveGraphData): Session => ({
+  id: `session-${Date.now()}`,
+  name,
+  createdAt: new Date().toISOString(),
+  messages: messages || [{
+    id: 'ai-initial-greeting',
+    author: Author.AI,
+    parts: [{ text: getRandomGreeting() }]
+  }],
+  graphData: graphData || { nodes: [], links: [] }
+});
 
 const App: React.FC = () => {
   const [isInitializing, setIsInitializing] = useState(true);
-  const [messages, setMessages] = useState<ChatMessageType[]>([INITIAL_MESSAGE]);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -56,16 +65,15 @@ const App: React.FC = () => {
   const [isUrlModalOpen, setIsUrlModalOpen] = useState(false);
   const [urlContext, setUrlContext] = useState<UrlContext | null>(null);
   const [fileContext, setFileContext] = useState<FileContext | null>(null);
-  const [graphData, setGraphData] = useState<CognitiveGraphData>({ nodes: [], links: [] });
-  const [memoryStatus, setMemoryStatus] = useState<'idle' | 'saving' | 'cleared' | 'distilling'>('idle');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastType, setToastType] = useState<'success' | 'cleared' | 'info'>('info');
   const [isChangelogModalOpen, setIsChangelogModalOpen] = useState(false);
   const [deleteCandidateId, setDeleteCandidateId] = useState<string | null>(null);
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null);
   const [graphSearchQuery, setGraphSearchQuery] = useState('');
+  const [isSessionManagerOpen, setIsSessionManagerOpen] = useState(false);
 
-  // Toggle states
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
   const [isSuggestionsEnabled, setIsSuggestionsEnabled] = useState(true);
   const [showNewMessageIndicator, setShowNewMessageIndicator] = useState(false);
@@ -77,6 +85,14 @@ const App: React.FC = () => {
   const suggestionTimeoutRef = useRef<number | null>(null);
   const nodePositions = useRef<{ [id: string]: { x: number; y: number } }>({});
   
+  const activeSession = useMemo(() => sessions.find(s => s.id === activeSessionId), [sessions, activeSessionId]);
+  const messages = activeSession?.messages || [];
+  const graphData = activeSession?.graphData || { nodes: [], links: [] };
+
+  const updateActiveSession = useCallback((updater: (session: Session) => Session) => {
+    setSessions(prev => prev.map(s => s.id === activeSessionId ? updater(s) : s));
+  }, [activeSessionId]);
+
   const renderedMarkdownPreview = useMemo(() => {
     if (window.marked && currentInput.trim()) {
         try {
@@ -93,33 +109,40 @@ const App: React.FC = () => {
   
   useEffect(() => {
     if (!isInitializing) setTimeout(() => inputRef.current?.focus(), 100);
-  }, [isInitializing]);
+  }, [isInitializing, activeSessionId]);
   
+  // Load from localStorage on initial mount
   useEffect(() => {
-    const savedGraph = localStorage.getItem('psi-cognitive-graph');
-    if (savedGraph) {
+    const savedSessions = localStorage.getItem('psi-sessions');
+    const lastActiveId = localStorage.getItem('psi-last-active-session');
+    let loadedSessions: Session[] = [];
+    if (savedSessions) {
         try {
-            const parsedGraph = JSON.parse(savedGraph);
-            setGraphData(parsedGraph);
-            console.log('[MEMORY]: Cognitive state loaded from persistence layer.');
+            loadedSessions = JSON.parse(savedSessions);
         } catch (e) {
-            console.error('[MEMORY_ERROR]: Failed to parse saved cognitive state.', e);
-            localStorage.removeItem('psi-cognitive-graph');
+            console.error('[MEMORY_ERROR]: Failed to parse saved sessions.', e);
         }
     }
-    const savedMessages = localStorage.getItem('psi-chat-history');
-    if (savedMessages) {
-        try {
-            const parsedMessages = JSON.parse(savedMessages);
-            if (Array.isArray(parsedMessages) && parsedMessages.length > 0) {
-              setMessages(parsedMessages);
-            }
-        } catch (e) {
-            console.error('[MEMORY_ERROR]: Failed to parse saved chat history.', e);
-            localStorage.removeItem('psi-chat-history');
-        }
+    
+    if (loadedSessions.length > 0) {
+        setSessions(loadedSessions);
+        setActiveSessionId(lastActiveId && loadedSessions.some(s => s.id === lastActiveId) ? lastActiveId : loadedSessions[0].id);
+    } else {
+        const firstSession = createNewSession('Primary Thread');
+        setSessions([firstSession]);
+        setActiveSessionId(firstSession.id);
     }
   }, []);
+
+  // Save to localStorage whenever sessions or activeSessionId change
+  useEffect(() => {
+    if (sessions.length > 0) {
+        localStorage.setItem('psi-sessions', JSON.stringify(sessions));
+    }
+    if (activeSessionId) {
+        localStorage.setItem('psi-last-active-session', activeSessionId);
+    }
+  }, [sessions, activeSessionId]);
 
   useEffect(() => {
       window.marked?.setOptions({
@@ -132,19 +155,20 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const updateGraph = async () => {
-        const newGraph = await processMessagesForGraph(messages);
+      if (!activeSession) return;
+        const newGraph = await processMessagesForGraph(activeSession.messages);
         newGraph.nodes.forEach(node => {
             if (nodePositions.current[node.id]) {
                 node.x = nodePositions.current[node.id].x;
                 node.y = nodePositions.current[node.id].y;
             }
         });
-        setGraphData(newGraph);
+        updateActiveSession(session => ({ ...session, graphData: newGraph }));
     };
-    if (messages.length > 1) { // Don't process initial greeting
+    if (messages.length > 1) {
         updateGraph();
     }
-  }, [messages]);
+  }, [messages, activeSession, updateActiveSession]);
 
   useEffect(() => {
     graphData.nodes.forEach(node => {
@@ -186,23 +210,14 @@ const App: React.FC = () => {
     return () => { if (suggestionTimeoutRef.current) clearTimeout(suggestionTimeoutRef.current); };
   }, [suggestions]);
 
-  // Handle Toast Notifications for memory status
   useEffect(() => {
-    if (memoryStatus === 'saving') {
-      setToastMessage('Cognitive state saved.');
-    } else if (memoryStatus === 'cleared') {
-      setToastMessage('Memory cleared & session reset.');
-    } else if (memoryStatus === 'distilling') {
-        setToastMessage('Distilling core memory...');
-    }
-    if (memoryStatus !== 'idle') {
+    if (toastMessage) {
       const timer = setTimeout(() => {
-        setMemoryStatus('idle');
         setToastMessage(null);
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [memoryStatus]);
+  }, [toastMessage]);
 
   const fetchSuggestions = useCallback(async (history: ChatMessageType[]) => {
       if (!isSuggestionsEnabled) return;
@@ -228,11 +243,18 @@ const App: React.FC = () => {
   const handleStream = async (stream: AsyncGenerator<GenerateContentResponse>, currentHistory: ChatMessageType[]) => {
     const aiMessageId = `ai-${Date.now()}`;
     let aiResponseText = '';
-    setMessages(prev => [...prev, { id: aiMessageId, author: Author.AI, parts: [{ text: '' }] }]);
+    
+    updateActiveSession(session => ({
+        ...session,
+        messages: [...session.messages, { id: aiMessageId, author: Author.AI, parts: [{ text: '' }] }]
+    }));
 
     for await (const chunk of stream) {
         aiResponseText += chunk.text;
-        setMessages(prev => prev.map(msg => msg.id === aiMessageId ? { ...msg, parts: [{ text: aiResponseText }] } : msg));
+        updateActiveSession(session => ({
+            ...session,
+            messages: session.messages.map(msg => msg.id === aiMessageId ? { ...msg, parts: [{ text: aiResponseText }] } : msg)
+        }));
     }
     
     const finalHistory = [...currentHistory, { id: aiMessageId, author: Author.AI, parts: [{ text: aiResponseText }] }];
@@ -240,7 +262,7 @@ const App: React.FC = () => {
   };
 
   const handleSendMessage = async (message: string) => {
-    if (!message.trim() && !urlContext && !fileContext) return;
+    if (!message.trim() && !urlContext && !fileContext || !activeSession) return;
     userScrolledUp.current = false;
     
     const userMessageParts: DisplayPart[] = [];
@@ -268,8 +290,8 @@ const App: React.FC = () => {
     setSuggestions([]);
     
     const userMessage: ChatMessageType = { id: `user-${Date.now()}`, author: Author.USER, parts: userMessageParts };
-    const newHistory = [...messages, userMessage];
-    setMessages(newHistory);
+    const newHistory = [...activeSession.messages, userMessage];
+    updateActiveSession(s => ({ ...s, messages: newHistory }));
     
     setIsLoading(true);
     setError(null);
@@ -282,24 +304,25 @@ const App: React.FC = () => {
       console.error(e);
       const aiErrorText = `SYSTEM_FAULT: ${errorMessage}`;
       setError(aiErrorText);
-      setMessages(prev => [ ...prev, { id: `err-${Date.now()}`, author: Author.AI, parts: [{ text: aiErrorText }] }]);
+      updateActiveSession(s => ({ ...s, messages: [ ...s.messages, { id: `err-${Date.now()}`, author: Author.AI, parts: [{ text: aiErrorText }] }] }));
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleSaveEdit = async (id: string, newText: string) => {
-    const messageIndex = messages.findIndex(msg => msg.id === id);
+    if (!activeSession) return;
+    const messageIndex = activeSession.messages.findIndex(msg => msg.id === id);
     if (messageIndex === -1) return;
 
-    const historyToFork = messages.slice(0, messageIndex);
-    const editedMessage = { ...messages[messageIndex] };
+    const historyToFork = activeSession.messages.slice(0, messageIndex);
+    const editedMessage = { ...activeSession.messages[messageIndex] };
     const textPartIndex = editedMessage.parts.findIndex(p => 'text' in p);
     if (textPartIndex !== -1) editedMessage.parts[textPartIndex] = { text: newText };
     else editedMessage.parts.push({ text: newText });
 
     const newHistory = [...historyToFork, editedMessage];
-    setMessages(newHistory);
+    updateActiveSession(s => ({...s, messages: newHistory }));
     setEditingMessageId(null);
     setSuggestions([]);
     setJustEditedMessageId(id);
@@ -315,42 +338,73 @@ const App: React.FC = () => {
       const errorMessage = e instanceof Error ? e.message : "An unknown error occurred.";
       const aiErrorText = `SYSTEM_FAULT: ${errorMessage}`;
       setError(aiErrorText);
-      setMessages(prev => [ ...prev, { id: `err-${Date.now()}`, author: Author.AI, parts: [{ text: aiErrorText }] }]);
+      updateActiveSession(s => ({...s, messages: [ ...s.messages, { id: `err-${Date.now()}`, author: Author.AI, parts: [{ text: aiErrorText }] }] }));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSaveMemory = useCallback(() => {
-    setMemoryStatus('saving');
-    try {
-        localStorage.setItem('psi-cognitive-graph', JSON.stringify(graphData));
-        localStorage.setItem('psi-chat-history', JSON.stringify(messages));
-        console.log('[MEMORY]: Cognitive state and chat history saved.');
-    } catch (e) {
-        console.error('[MEMORY_ERROR]: Failed to save state.', e);
-    }
-  }, [graphData, messages]);
+  const handleNewSession = () => {
+    const newSession = createNewSession(`Thread ${sessions.length + 1}`);
+    setSessions(prev => [...prev, newSession]);
+    setActiveSessionId(newSession.id);
+    setToastMessage('New cognitive thread created.');
+    setToastType('info');
+    setIsSessionManagerOpen(false);
+  };
 
-  const handleClearMemory = () => {
-    localStorage.removeItem('psi-cognitive-graph');
-    localStorage.removeItem('psi-chat-history');
-    setGraphData({ nodes: [], links: [] });
-    setMessages([INITIAL_MESSAGE]);
-    setMemoryStatus('cleared');
-    console.log('[MEMORY]: Persistence layer and session state cleared.');
+  const handleForkSession = () => {
+    if (!activeSession) return;
+    const newName = prompt("Enter name for forked thread:", `${activeSession.name} (Fork)`);
+    if (!newName) return;
+    const forkedSession = createNewSession(newName, activeSession.messages, activeSession.graphData);
+    setSessions(prev => [...prev, forkedSession]);
+    setActiveSessionId(forkedSession.id);
+    setToastMessage('Cognitive thread forked.');
+    setToastType('info');
+    setIsSessionManagerOpen(false);
+  };
+
+  const handleSwitchSession = (sessionId: string) => {
+    if (sessionId === activeSessionId) return;
+    setActiveSessionId(sessionId);
+    setGraphSearchQuery(''); // Reset search when switching
+    userScrolledUp.current = false;
+    isInitialLoad.current = true;
+    setTimeout(() => scrollToBottom('auto'), 0);
+  };
+
+  const handleRenameSession = (sessionId: string, newName: string) => {
+    setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, name: newName } : s));
+    setToastMessage('Thread renamed.');
+    setToastType('success');
+  };
+
+  const handleDeleteSession = (sessionId: string) => {
+    setSessions(prev => {
+        const remaining = prev.filter(s => s.id !== sessionId);
+        if (remaining.length === 0) {
+            const newSession = createNewSession('Primary Thread');
+            setActiveSessionId(newSession.id);
+            return [newSession];
+        }
+        if (sessionId === activeSessionId) {
+            setActiveSessionId(remaining[0].id);
+        }
+        return remaining;
+    });
+    setToastMessage('Cognitive thread deleted.');
+    setToastType('cleared');
+    setDeleteCandidateId(null);
   };
 
   const handleDelete = () => {
-    if (deleteCandidateId === 'memory-wipe-confirmation') {
-        handleClearMemory();
-    }
-    setDeleteCandidateId(null);
+    if (!deleteCandidateId) return;
+    handleDeleteSession(deleteCandidateId);
   };
   
   const handleAutonomousThought = useCallback(async () => {
-    if (isLoading || graphData.nodes.length < 3) return;
-
+    if (isLoading || graphData.nodes.length < 3 || !activeSession) return;
     setIsLoading(true);
     setSuggestions([]);
 
@@ -363,35 +417,36 @@ const App: React.FC = () => {
 
     const systemMessageId = `system-${Date.now()}`;
     const systemMessageText = `[AUTONOMOUS_CYCLE_INITIATED] :: Exploring connection: ${importantNodes[0]?.label || '...'} <-> ${importantNodes[1]?.label || '...'}`;
-    const newHistoryWithSystem = [...messages, { id: systemMessageId, author: Author.SYSTEM, parts: [{ text: systemMessageText }] }];
-    setMessages(newHistoryWithSystem);
+    const newHistoryWithSystem = [...activeSession.messages, { id: systemMessageId, author: Author.SYSTEM, parts: [{ text: systemMessageText }] }];
+    updateActiveSession(s => ({ ...s, messages: newHistoryWithSystem }));
     
     try {
-        const thoughtChat = createChatSession(messages);
+        const thoughtChat = createChatSession(activeSession.messages);
         const stream = await thoughtChat.sendMessageStream({ message: prompt });
         await handleStream(stream, newHistoryWithSystem);
     } catch (e) {
         const errorMessage = e instanceof Error ? e.message : "An unknown error occurred during thought cycle.";
         const aiErrorText = `SYSTEM_FAULT (AUTONOMOUS): ${errorMessage}`;
-        setMessages(prev => [...prev, { id: `err-${Date.now()}`, author: Author.AI, parts: [{ text: aiErrorText }] }]);
+        updateActiveSession(s => ({...s, messages: [...s.messages, { id: `err-${Date.now()}`, author: Author.AI, parts: [{ text: aiErrorText }] }] }));
     } finally {
         setIsLoading(false);
     }
-  }, [isLoading, graphData, messages, fetchSuggestions]);
+  }, [isLoading, graphData, activeSession, fetchSuggestions, updateActiveSession]);
 
   const handleDistillMemory = useCallback(async () => {
-    if (isLoading || messages.length < 5) return; // Don't summarize a short conversation
+    if (isLoading || messages.length < 5 || !activeSessionId) return;
     setIsLoading(true);
-    setMemoryStatus('distilling');
+    setToastMessage('Distilling core memory...');
+    setToastType('info');
     
     const systemMessageId = `system-${Date.now()}`;
     const systemMessageText = '[COGNITIVE_DISTILLATION_INITIATED] :: Analyzing conversational history to generate core memory abstract...';
-    setMessages(prev => [...prev, { id: systemMessageId, author: Author.SYSTEM, parts: [{ text: systemMessageText }] }]);
+    updateActiveSession(s => ({...s, messages: [...s.messages, { id: systemMessageId, author: Author.SYSTEM, parts: [{ text: systemMessageText }] }]}));
     
     try {
         const { summary, key_themes } = await summarizeConversation(messages);
         
-        setGraphData(prevGraph => {
+        updateActiveSession(session => {
             const summaryNodeId = `summary-${Date.now()}`;
             const summaryNode: Omit<GraphNode, 'x' | 'y' | 'vx' | 'vy'> = {
                 id: summaryNodeId,
@@ -400,32 +455,34 @@ const App: React.FC = () => {
                 size: 15,
                 weight: 1.0,
                 sentiment: 0,
-                summaryText: summary // Store the summary here
+                summaryText: summary
             };
 
             const newLinks = key_themes.map(theme => {
                 const conceptId = `concept-${theme.toLowerCase().replace(/\s/g, '-')}`;
-                const existingNode = prevGraph.nodes.find(n => n.id === conceptId);
+                const existingNode = session.graphData.nodes.find(n => n.id === conceptId);
                 return existingNode ? { source: summaryNodeId, target: conceptId, weight: 1.0 } : null;
             }).filter(Boolean) as { source: string; target: string; weight: number; }[];
             
             return {
-                nodes: [...prevGraph.nodes, summaryNode] as GraphNode[],
-                links: [...prevGraph.links, ...newLinks]
+                ...session,
+                graphData: {
+                    nodes: [...session.graphData.nodes, summaryNode] as GraphNode[],
+                    links: [...session.graphData.links, ...newLinks]
+                }
             };
         });
         setToastMessage('Memory distilled successfully.');
+        setToastType('success');
 
     } catch(e) {
         const errorMessage = e instanceof Error ? e.message : "An unknown error occurred during distillation.";
         const aiErrorText = `SYSTEM_FAULT (DISTILLATION): ${errorMessage}`;
-        setMessages(prev => [...prev, { id: `err-${Date.now()}`, author: Author.AI, parts: [{ text: aiErrorText }] }]);
+        updateActiveSession(s => ({...s, messages: [...s.messages, { id: `err-${Date.now()}`, author: Author.AI, parts: [{ text: aiErrorText }] }] }));
     } finally {
         setIsLoading(false);
-        setMemoryStatus('idle');
     }
-  }, [isLoading, messages]);
-
+  }, [isLoading, messages, activeSessionId, updateActiveSession]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -460,7 +517,7 @@ const App: React.FC = () => {
     }
   }, []);
 
-  if (isInitializing) return <SplashScreen onFinished={() => setIsInitializing(false)} />;
+  if (isInitializing || !activeSession) return <SplashScreen onFinished={() => setIsInitializing(false)} />;
   const hasAttachment = !!urlContext || !!fileContext;
 
   return (
@@ -471,13 +528,13 @@ const App: React.FC = () => {
         isOpen={!!deleteCandidateId}
         onClose={() => setDeleteCandidateId(null)}
         onConfirm={handleDelete}
-        title={deleteCandidateId === 'memory-wipe-confirmation' ? "Confirm Memory Wipe" : "Confirm Deletion"}
-        bodyText={deleteCandidateId === 'memory-wipe-confirmation' ? "This will permanently erase the cognitive graph and chat history from browser storage and reset the session. This action cannot be undone." : "This will delete the selected message and the AI's response, altering the conversational context. This action cannot be undone."}
-        confirmText={deleteCandidateId === 'memory-wipe-confirmation' ? "Wipe & Reset" : "Delete & Proceed"}
+        title="Confirm Deletion"
+        bodyText={`This will permanently delete the cognitive thread "${sessions.find(s=>s.id===deleteCandidateId)?.name}". This action cannot be undone.`}
+        confirmText="Delete & Proceed"
       />
       <ToastNotification 
         message={toastMessage} 
-        type={memoryStatus === 'cleared' ? 'cleared' : memoryStatus === 'distilling' ? 'info' : 'success'} 
+        type={toastType} 
       />
       <div className="main-frame">
         <div className="scanline-overlay"></div>
@@ -485,9 +542,22 @@ const App: React.FC = () => {
         
         <Header
             onOpenChangelog={() => setIsChangelogModalOpen(true)}
-            onSaveMemory={handleSaveMemory}
-            onClearMemory={() => setDeleteCandidateId('memory-wipe-confirmation')}
+            onToggleSessions={() => setIsSessionManagerOpen(p => !p)}
+            isSessionManagerOpen={isSessionManagerOpen}
+            activeSessionName={activeSession.name}
         />
+        {isSessionManagerOpen && (
+            <SessionManager
+                sessions={sessions}
+                activeSessionId={activeSessionId}
+                onNew={handleNewSession}
+                onFork={handleForkSession}
+                onSwitch={handleSwitchSession}
+                onRename={handleRenameSession}
+                onDelete={setDeleteCandidateId}
+                onClose={() => setIsSessionManagerOpen(false)}
+            />
+        )}
         
         <div className="content-grid">
             <div className="panel graph-panel">

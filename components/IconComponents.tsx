@@ -57,10 +57,10 @@ export const SendIcon: React.FC = () => (
     </svg>
 );
 
-export const CopyIcon: React.FC = () => (
+export const CopyIcon: React.FC<{className?: string}> = ({className}) => (
     <svg
         xmlns="http://www.w3.org/2000/svg"
-        className="h-5 w-5"
+        className={className ?? "h-5 w-5"}
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -74,10 +74,10 @@ export const CopyIcon: React.FC = () => (
     </svg>
 );
 
-export const CheckIcon: React.FC = () => (
+export const CheckIcon: React.FC<{className?: string}> = ({className}) => (
     <svg
         xmlns="http://www.w3.org/2000/svg"
-        className="h-5 w-5 text-success"
+        className={className ?? "h-5 w-5 text-success"}
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -87,10 +87,10 @@ export const CheckIcon: React.FC = () => (
     </svg>
 );
 
-export const EditIcon: React.FC = () => (
+export const EditIcon: React.FC<{className?: string}> = ({className}) => (
     <svg
         xmlns="http://www.w3.org/2000/svg"
-        className="h-5 w-5"
+        className={className ?? "h-5 w-5"}
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -176,12 +176,34 @@ export const SettingsIcon: React.FC = () => (
     </svg>
 );
 
-export const SaveIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+export const SessionsIcon: React.FC = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+      <path d="M2 17h20" />
+      <path d="M4 12.8A5 5 0 0 1 9 8h6a5 5 0 0 1 5 5v0a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5Z" />
+      <path d="M12 8V2" />
+      <path d="m5 2 1 6" />
+      <path d="m19 2-1 6" />
+    </svg>
 );
 
-export const MemoryWipeIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M2 12h2.5a2.5 2.5 0 1 0 0-5H2v5z"/><path d="M2 17h2.5a2.5 2.5 0 1 1 0 5H2v-5z"/><path d="M19.5 7H22v5h-2.5a2.5 2.5 0 0 1 0-5z"/><path d="M19.5 12H22v5h-2.5a2.5 2.5 0 0 0 0-5z"/><path d="M11 2a2.5 2.5 0 0 0-5 0v1.5A2.5 2.5 0 0 0 8.5 6H12a3 3 0 0 0 3-3V2h-4z"/><path d="m15 22 3.5-1.5 3.5 1.5-2-4.5-2 4.5z"/><path d="M12.5 6H15a2.5 2.5 0 0 1 2.5 2.5V10"/><path d="M11 22v-6.5A2.5 2.5 0 0 0 8.5 13H6"/></svg>
+export const ForkIcon: React.FC = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+        <path d="M12 12v-4" /><path d="M10 10c-1.67 0-3 1.33-3 3s1.33 3 3 3" /><path d="M14 10c1.67 0 3 1.33 3 3s-1.33 3-3 3" /><path d="M12 2v2" /><path d="m15 5-2-2-2 2" />
+    </svg>
+);
+
+export const PlusIcon: React.FC = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+      <line x1="12" y1="5" x2="12" y2="19"></line>
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+    </svg>
+);
+
+export const TrashIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className ?? "h-5 w-5"}>
+        <polyline points="3 6 5 6 21 6"></polyline>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+    </svg>
 );
 
 export const ChangelogIcon: React.FC = () => (

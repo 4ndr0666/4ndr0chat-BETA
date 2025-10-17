@@ -1,4 +1,5 @@
 import { Part } from "@google/genai";
+import { CognitiveGraphData } from "./services/cognitiveCore";
 
 export enum Author {
   USER = 'user',
@@ -25,4 +26,12 @@ export interface FileContext {
   file: File;
   base64: string;
   mimeType: string;
+}
+
+export interface Session {
+  id: string;
+  name: string;
+  createdAt: string;
+  messages: ChatMessage[];
+  graphData: CognitiveGraphData;
 }
