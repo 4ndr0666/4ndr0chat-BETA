@@ -517,6 +517,55 @@ const App: React.FC = () => {
     }
   }, []);
 
+  const handleExportSession = (sessionId: string) => {
+    const sessionToExp = sessions.find(s => s.id === sessionId);
+    if (!sessionToExp) return;
+
+    const dataStr = JSON.stringify(sessionToExp, null, 2);
+    const dataBlob = new Blob([dataStr], {type: "application/json"});
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.download = `psi-session-${sessionToExp.name.replace(/ /g, '_')}-${new Date().toISOString()}.json`;
+    link.href = url;
+    link.click();
+    URL.revokeObjectURL(url);
+    setToastMessage('Session exported.');
+    setToastType('success');
+  };
+  
+  const handleImportSession = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const text = e.target?.result;
+            if (typeof text !== 'string') throw new Error("File could not be read as text.");
+            const importedSession = JSON.parse(text);
+            
+            // Basic validation
+            if (importedSession.id && importedSession.name && importedSession.messages && importedSession.graphData) {
+                // Ensure ID is unique
+                const newSession = { ...importedSession, id: `session-imported-${Date.now()}` };
+                setSessions(prev => [...prev, newSession]);
+                setActiveSessionId(newSession.id);
+                setToastMessage('Session imported successfully.');
+                setToastType('success');
+            } else {
+                throw new Error("Invalid session file format.");
+            }
+        } catch (error) {
+            console.error("Import error:", error);
+            setError("Failed to import session. The file may be corrupt or in the wrong format.");
+        }
+    };
+    reader.readAsText(file);
+    // Reset file input value to allow importing the same file again
+    event.target.value = '';
+  };
+
+
   if (isInitializing || !activeSession) return <SplashScreen onFinished={() => setIsInitializing(false)} />;
   const hasAttachment = !!urlContext || !!fileContext;
 
@@ -555,6 +604,8 @@ const App: React.FC = () => {
                 onSwitch={handleSwitchSession}
                 onRename={handleRenameSession}
                 onDelete={setDeleteCandidateId}
+                onExport={handleExportSession}
+                onImport={handleImportSession}
                 onClose={() => setIsSessionManagerOpen(false)}
             />
         )}

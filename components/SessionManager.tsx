@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Session } from '../types';
-import { EditIcon, TrashIcon, PlusIcon, ForkIcon, CheckIcon } from './IconComponents';
+import { EditIcon, TrashIcon, PlusIcon, ForkIcon, CheckIcon, ExportIcon, ImportIcon } from './IconComponents';
 
 interface SessionManagerProps {
     sessions: Session[];
@@ -10,13 +10,16 @@ interface SessionManagerProps {
     onSwitch: (sessionId: string) => void;
     onRename: (sessionId: string, newName: string) => void;
     onDelete: (sessionId: string) => void;
+    onExport: (sessionId: string) => void;
+    onImport: (event: React.ChangeEvent<HTMLInputElement>) => void;
     onClose: () => void;
 }
 
-const SessionManager: React.FC<SessionManagerProps> = ({ sessions, activeSessionId, onNew, onFork, onSwitch, onRename, onDelete, onClose }) => {
+const SessionManager: React.FC<SessionManagerProps> = ({ sessions, activeSessionId, onNew, onFork, onSwitch, onRename, onDelete, onExport, onImport, onClose }) => {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [renameValue, setRenameValue] = useState('');
     const popoverRef = useRef<HTMLDivElement>(null);
+    const importInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -50,6 +53,7 @@ const SessionManager: React.FC<SessionManagerProps> = ({ sessions, activeSession
     
     return (
         <div ref={popoverRef} className="session-manager-popover">
+            <input type="file" ref={importInputRef} className="hidden" accept=".json" onChange={onImport} />
             <div className="session-list space-y-1">
                 {sessions.map(session => (
                     <div key={session.id} className={`session-item ${session.id === activeSessionId ? 'active-session' : ''}`}>
@@ -76,6 +80,9 @@ const SessionManager: React.FC<SessionManagerProps> = ({ sessions, activeSession
                                     {session.name}
                                 </span>
                                 <div className="session-item-actions">
+                                    <button onClick={() => onExport(session.id)} aria-label="Export session" title="Export">
+                                        <ExportIcon className="h-4 w-4" />
+                                    </button>
                                     <button onClick={() => handleStartRename(session)} aria-label="Rename session" title="Rename">
                                         <EditIcon className="h-4 w-4" />
                                     </button>
@@ -91,6 +98,9 @@ const SessionManager: React.FC<SessionManagerProps> = ({ sessions, activeSession
             <div className="flex justify-between items-center pt-2 border-t border-[var(--border-color)]">
                 <p className="text-xs text-text-tertiary">{sessions.length} Threads</p>
                 <div className="flex gap-2">
+                    <button onClick={() => importInputRef.current?.click()} className="action-button p-2" aria-label="Import session" title="Import Thread">
+                        <ImportIcon />
+                    </button>
                     <button onClick={onNew} className="action-button p-2" aria-label="New cognitive thread" title="New Thread">
                         <PlusIcon />
                     </button>
