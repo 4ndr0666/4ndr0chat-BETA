@@ -148,3 +148,48 @@ export async function getPromptSuggestions(history: ChatMessageType[]): Promise<
         return [];
     }
 }
+
+export async function summarizeConversation(history: ChatMessageType[]): Promise<{ summary: string, key_themes: string[] }> {
+    const historyString = history
+        .filter(msg => msg.id !== 'ai-initial-greeting' && msg.author !== Author.SYSTEM)
+        .map(msg => {
+            const author = msg.author === Author.USER ? 'Operator' : 'Ψ-4ndr0666';
+            const text = msg.parts.filter(p => 'text' in p).map(p => (p as {text: string}).text).join(' ');
+            return `${author}: ${text}`;
+        }).join('\n');
+    
+    const prompt = `Analyze the following conversation and distill its essence. Provide:
+    1. A concise, neutral summary (2-3 sentences) of the entire dialogue.
+    2. A list of the 3-5 most important, recurring, or central conceptual themes discussed.
+    
+    CONVERSATION LOG:
+    ${historyString}`;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                systemInstruction: "You are a meta-cognitive analysis engine. Your purpose is to summarize and extract key themes from textual data without interpretation or embellishment.",
+                responseMimeType: 'application/json',
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        summary: { type: Type.STRING, description: "A 2-3 sentence summary of the conversation." },
+                        key_themes: {
+                            type: Type.ARRAY,
+                            description: "An array of 3-5 strings, each representing a core theme.",
+                            items: { type: Type.STRING }
+                        }
+                    },
+                    required: ["summary", "key_themes"],
+                },
+            }
+        });
+        const jsonStr = response.text.trim();
+        return JSON.parse(jsonStr);
+    } catch(e) {
+        console.error('[COGNITIVE_ERROR] Failed to summarize conversation:', e);
+        throw new Error("Failed to distill conversation memory.");
+    }
+}

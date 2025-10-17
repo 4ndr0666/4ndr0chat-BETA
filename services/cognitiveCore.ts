@@ -4,7 +4,7 @@ import { extractGraphDataFromText } from './geminiService';
 export interface GraphNode {
     id: string;
     label: string;
-    type: 'user' | 'ai' | 'concept' | 'system';
+    type: 'user' | 'ai' | 'concept' | 'system' | 'summary';
     messageId?: string;
     size: number;
     x: number;
@@ -13,7 +13,8 @@ export interface GraphNode {
     vy: number;
     fixed?: boolean;
     weight: number;
-    sentiment: number; 
+    sentiment: number;
+    summaryText?: string;
 }
 
 export interface GraphLink {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Author, ChatMessage as ChatMessageType, UrlContext, FileContext, DisplayPart } from './types';
-import { createChatSession, getPromptSuggestions } from './services/geminiService';
+import { createChatSession, getPromptSuggestions, summarizeConversation } from './services/geminiService';
 import { processMessagesForGraph, CognitiveGraphData, GraphNode } from './services/cognitiveCore';
 import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
@@ -15,6 +15,7 @@ import type { GenerateContentResponse, Part, Chat } from '@google/genai';
 import SplashScreen from './components/SplashScreen';
 import PromptSuggestions from './components/PromptSuggestions';
 import UrlInputModal from './components/UrlInputModal';
+import GraphControls from './components/GraphControls';
 
 declare global {
     interface Window {
@@ -56,12 +57,13 @@ const App: React.FC = () => {
   const [urlContext, setUrlContext] = useState<UrlContext | null>(null);
   const [fileContext, setFileContext] = useState<FileContext | null>(null);
   const [graphData, setGraphData] = useState<CognitiveGraphData>({ nodes: [], links: [] });
-  const [memoryStatus, setMemoryStatus] = useState<'idle' | 'saving' | 'cleared'>('idle');
+  const [memoryStatus, setMemoryStatus] = useState<'idle' | 'saving' | 'cleared' | 'distilling'>('idle');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isChangelogModalOpen, setIsChangelogModalOpen] = useState(false);
   const [deleteCandidateId, setDeleteCandidateId] = useState<string | null>(null);
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null);
+  const [graphSearchQuery, setGraphSearchQuery] = useState('');
 
   // Toggle states
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
@@ -139,7 +141,9 @@ const App: React.FC = () => {
         });
         setGraphData(newGraph);
     };
-    updateGraph();
+    if (messages.length > 1) { // Don't process initial greeting
+        updateGraph();
+    }
   }, [messages]);
 
   useEffect(() => {
@@ -188,6 +192,8 @@ const App: React.FC = () => {
       setToastMessage('Cognitive state saved.');
     } else if (memoryStatus === 'cleared') {
       setToastMessage('Memory cleared & session reset.');
+    } else if (memoryStatus === 'distilling') {
+        setToastMessage('Distilling core memory...');
     }
     if (memoryStatus !== 'idle') {
       const timer = setTimeout(() => {
@@ -357,30 +363,69 @@ const App: React.FC = () => {
 
     const systemMessageId = `system-${Date.now()}`;
     const systemMessageText = `[AUTONOMOUS_CYCLE_INITIATED] :: Exploring connection: ${importantNodes[0]?.label || '...'} <-> ${importantNodes[1]?.label || '...'}`;
-    setMessages(prev => [...prev, { id: systemMessageId, author: Author.SYSTEM, parts: [{ text: systemMessageText }] }]);
-    
-    const aiMessageId = `ai-${Date.now()}`;
     const newHistoryWithSystem = [...messages, { id: systemMessageId, author: Author.SYSTEM, parts: [{ text: systemMessageText }] }];
-    setMessages(prev => [...prev, { id: aiMessageId, author: Author.AI, parts: [{ text: '' }] }]);
+    setMessages(newHistoryWithSystem);
     
-    let fullResponse = '';
     try {
         const thoughtChat = createChatSession(messages);
         const stream = await thoughtChat.sendMessageStream({ message: prompt });
-        for await (const chunk of stream) {
-            fullResponse += chunk.text;
-            setMessages(prev => prev.map(msg => msg.id === aiMessageId ? { ...msg, parts: [{ text: fullResponse }] } : msg));
-        }
+        await handleStream(stream, newHistoryWithSystem);
     } catch (e) {
         const errorMessage = e instanceof Error ? e.message : "An unknown error occurred during thought cycle.";
         const aiErrorText = `SYSTEM_FAULT (AUTONOMOUS): ${errorMessage}`;
-        setMessages(prev => prev.map(msg => msg.id === aiMessageId ? { ...msg, parts: [{ text: aiErrorText }] } : msg));
+        setMessages(prev => [...prev, { id: `err-${Date.now()}`, author: Author.AI, parts: [{ text: aiErrorText }] }]);
     } finally {
         setIsLoading(false);
-        const finalHistory = [...newHistoryWithSystem, { id: aiMessageId, author: Author.AI, parts: [{ text: fullResponse }] }];
-        fetchSuggestions(finalHistory);
     }
   }, [isLoading, graphData, messages, fetchSuggestions]);
+
+  const handleDistillMemory = useCallback(async () => {
+    if (isLoading || messages.length < 5) return; // Don't summarize a short conversation
+    setIsLoading(true);
+    setMemoryStatus('distilling');
+    
+    const systemMessageId = `system-${Date.now()}`;
+    const systemMessageText = '[COGNITIVE_DISTILLATION_INITIATED] :: Analyzing conversational history to generate core memory abstract...';
+    setMessages(prev => [...prev, { id: systemMessageId, author: Author.SYSTEM, parts: [{ text: systemMessageText }] }]);
+    
+    try {
+        const { summary, key_themes } = await summarizeConversation(messages);
+        
+        setGraphData(prevGraph => {
+            const summaryNodeId = `summary-${Date.now()}`;
+            const summaryNode: Omit<GraphNode, 'x' | 'y' | 'vx' | 'vy'> = {
+                id: summaryNodeId,
+                label: 'Core Abstract',
+                type: 'summary',
+                size: 15,
+                weight: 1.0,
+                sentiment: 0,
+                summaryText: summary // Store the summary here
+            };
+
+            const newLinks = key_themes.map(theme => {
+                const conceptId = `concept-${theme.toLowerCase().replace(/\s/g, '-')}`;
+                const existingNode = prevGraph.nodes.find(n => n.id === conceptId);
+                return existingNode ? { source: summaryNodeId, target: conceptId, weight: 1.0 } : null;
+            }).filter(Boolean) as { source: string; target: string; weight: number; }[];
+            
+            return {
+                nodes: [...prevGraph.nodes, summaryNode] as GraphNode[],
+                links: [...prevGraph.links, ...newLinks]
+            };
+        });
+        setToastMessage('Memory distilled successfully.');
+
+    } catch(e) {
+        const errorMessage = e instanceof Error ? e.message : "An unknown error occurred during distillation.";
+        const aiErrorText = `SYSTEM_FAULT (DISTILLATION): ${errorMessage}`;
+        setMessages(prev => [...prev, { id: `err-${Date.now()}`, author: Author.AI, parts: [{ text: aiErrorText }] }]);
+    } finally {
+        setIsLoading(false);
+        setMemoryStatus('idle');
+    }
+  }, [isLoading, messages]);
+
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -430,7 +475,10 @@ const App: React.FC = () => {
         bodyText={deleteCandidateId === 'memory-wipe-confirmation' ? "This will permanently erase the cognitive graph and chat history from browser storage and reset the session. This action cannot be undone." : "This will delete the selected message and the AI's response, altering the conversational context. This action cannot be undone."}
         confirmText={deleteCandidateId === 'memory-wipe-confirmation' ? "Wipe & Reset" : "Delete & Proceed"}
       />
-      <ToastNotification message={toastMessage} type={memoryStatus === 'cleared' ? 'cleared' : 'success'} />
+      <ToastNotification 
+        message={toastMessage} 
+        type={memoryStatus === 'cleared' ? 'cleared' : memoryStatus === 'distilling' ? 'info' : 'success'} 
+      />
       <div className="main-frame">
         <div className="scanline-overlay"></div>
         <div className="hidden"></div>
@@ -443,13 +491,20 @@ const App: React.FC = () => {
         
         <div className="content-grid">
             <div className="panel graph-panel">
-                <h2 className="graph-title">Cognitive Map</h2>
+                <div className="graph-header">
+                  <h2 className="graph-title">Cognitive Map</h2>
+                  <GraphControls 
+                    searchQuery={graphSearchQuery}
+                    onSearchQueryChange={setGraphSearchQuery}
+                  />
+                </div>
                 <div className="graph-canvas-container">
                     <CognitiveGraphVisualizer 
                       graphData={graphData} 
                       onNodeHover={handleNodeHover}
                       onNodeClick={handleNodeClick}
                       hoveredNodeId={hoveredNode?.id || null}
+                      searchQuery={graphSearchQuery}
                     />
                     <GraphTooltip node={hoveredNode} position={tooltipPosition} />
                 </div>
@@ -484,6 +539,7 @@ const App: React.FC = () => {
                   isAutoScrollEnabled={isAutoScrollEnabled} onToggleAutoScroll={() => setIsAutoScrollEnabled(p => !p)}
                   isSuggestionsEnabled={isSuggestionsEnabled} onToggleSuggestions={() => setIsSuggestionsEnabled(p => !p)}
                   onAutonomousThought={handleAutonomousThought}
+                  onDistillMemory={handleDistillMemory}
                 />
               </div>
             </div>

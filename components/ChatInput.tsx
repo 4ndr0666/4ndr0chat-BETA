@@ -1,6 +1,6 @@
 import React, { forwardRef, useState, useRef, useEffect } from 'react';
 import AutoResizeTextarea from './AutoResizeTextarea';
-import { SendIcon, ClearIcon, LinkIcon, PaperclipIcon, AutoScrollOnIcon, AutoScrollOffIcon, SuggestionsOnIcon, SuggestionsOffIcon, SettingsIcon, ThoughtIcon } from './IconComponents';
+import { SendIcon, ClearIcon, LinkIcon, PaperclipIcon, AutoScrollOnIcon, AutoScrollOffIcon, SuggestionsOnIcon, SuggestionsOffIcon, SettingsIcon, ThoughtIcon, DistillIcon } from './IconComponents';
 
 interface ChatInputProps {
   input: string;
@@ -16,13 +16,14 @@ interface ChatInputProps {
   isSuggestionsEnabled: boolean;
   onToggleSuggestions: () => void;
   onAutonomousThought: () => void;
+  onDistillMemory: () => void;
 }
 
 const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
   ({ 
     input, setInput, onSendMessage, isLoading, maxLength, onOpenUrlModal, onFileChange,
     hasAttachment, isAutoScrollEnabled, onToggleAutoScroll, isSuggestionsEnabled, onToggleSuggestions,
-    onAutonomousThought
+    onAutonomousThought, onDistillMemory
   }, ref) => {
     const [isFocused, setIsFocused] = useState(false);
     const [isToolsOpen, setIsToolsOpen] = useState(false);
@@ -99,6 +100,9 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 </button>
                 <button type="button" onClick={onAutonomousThought} className="action-button" title="Initiate Autonomous Thought Cycle" aria-label="Initiate thought cycle" disabled={isLoading}>
                     <ThoughtIcon />
+                </button>
+                 <button type="button" onClick={onDistillMemory} className="action-button" title="Distill Core Memory" aria-label="Distill core memory from conversation" disabled={isLoading}>
+                    <DistillIcon />
                 </button>
             </div>
             <div className="chat-input-grid-area">

@@ -198,3 +198,15 @@ export const ThoughtIcon: React.FC = () => (
         <path d="M12 2a10 10 0 0 1 4.17 18.17" />
     </svg>
 );
+
+export const DistillIcon: React.FC = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+        <path d="M2 3h20" /><path d="M3 7v1a3 3 0 0 0 6 0V7" /><path d="M15 7v1a3 3 0 0 0 6 0V7" /><path d="M6 21a3 3 0 0 0 6 0v-6a3 3 0 0 0-6 0v6Z" /><path d="M15 21a3 3 0 0 0 6 0v-6a3 3 0 0 0-6 0v6Z" />
+    </svg>
+);
+
+export const SearchIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className ?? "h-6 w-6"}>
+        <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+    </svg>
+);

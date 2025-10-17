@@ -6,16 +6,18 @@ interface CognitiveGraphVisualizerProps {
   onNodeHover: (node: GraphNode | null, position: { x: number, y: number } | null) => void;
   onNodeClick: (node: GraphNode) => void;
   hoveredNodeId: string | null;
+  searchQuery: string;
 }
 
 const NODE_COLORS: Record<GraphNode['type'], string> = {
   user: '#4ade80', // green
   ai: '#60a5fa',   // blue
   concept: '#e0ffff',
-  system: '#94a3b8' // slate
+  system: '#94a3b8', // slate
+  summary: '#facc15' // amber
 };
 
-const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({ graphData, onNodeHover, onNodeClick, hoveredNodeId }) => {
+const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({ graphData, onNodeHover, onNodeClick, hoveredNodeId, searchQuery }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameId = useRef<number | null>(null);
 
@@ -26,6 +28,7 @@ const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({ gra
     if (!context) return;
 
     let { nodes, links } = graphData;
+    const searchLower = searchQuery.toLowerCase();
 
     nodes.forEach(node => {
       if (isNaN(node.x) || isNaN(node.y)) {
@@ -122,28 +125,44 @@ const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({ gra
 
     const draw = () => {
         context.clearRect(0, 0, canvas.width, canvas.height);
+        const hasSearch = searchLower.length > 0;
+        const matchedNodeIds = hasSearch ? new Set(nodes.filter(n => n.label.toLowerCase().includes(searchLower)).map(n => n.id)) : null;
 
         links.forEach(link => {
             const source = nodes.find(n => n.id === link.source);
             const target = nodes.find(n => n.id === link.target);
             if (!source || !target) return;
+
+            const isDimmed = hasSearch && (!matchedNodeIds?.has(source.id) || !matchedNodeIds?.has(target.id));
+
             context.beginPath();
             context.moveTo(source.x, source.y);
             context.lineTo(target.x, target.y);
-            context.strokeStyle = `rgba(112, 192, 192, ${0.1 + link.weight * 0.4})`;
+            context.strokeStyle = `rgba(112, 192, 192, ${isDimmed ? 0.05 : (0.1 + link.weight * 0.4)})`;
             context.lineWidth = 0.5 + link.weight * 1.5;
             context.stroke();
         });
 
         nodes.forEach(node => {
             const size = node.size + (node.weight * 8);
-            
+            const isMatched = hasSearch ? matchedNodeIds?.has(node.id) : true;
+            const isDimmed = hasSearch && !isMatched;
+
             // Highlight for hovered node
             if (node.id === hoveredNodeId) {
                 context.beginPath();
                 context.arc(node.x, node.y, size + 4, 0, 2 * Math.PI);
                 context.fillStyle = 'rgba(21, 250, 250, 0.3)';
                 context.fill();
+            }
+
+            if (isMatched && hasSearch) {
+                 const highlightRadius = size + 6 + Math.sin(Date.now() / 200) * 2;
+                 context.beginPath();
+                 context.arc(node.x, node.y, highlightRadius, 0, 2 * Math.PI);
+                 context.strokeStyle = `rgba(21, 250, 250, ${0.5 + Math.sin(Date.now() / 200) * 0.2})`;
+                 context.lineWidth = 2;
+                 context.stroke();
             }
 
             context.beginPath();
@@ -159,10 +178,13 @@ const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({ gra
                 }
             }
             context.fillStyle = color;
+            context.globalAlpha = isDimmed ? 0.2 : 1.0;
             context.fill();
+            context.globalAlpha = 1.0;
 
-            if ((node.type === 'concept' && node.weight > 0.7) || node.id === hoveredNodeId) {
-                context.fillStyle = 'var(--text-primary)';
+
+            if ((node.type === 'concept' && node.weight > 0.7) || node.id === hoveredNodeId || node.type === 'summary' || isMatched) {
+                context.fillStyle = isDimmed ? 'rgba(224, 255, 255, 0.4)' : 'var(--text-primary)';
                 context.font = '10px "Roboto Mono"';
                 context.textAlign = 'center';
                 context.fillText(node.label, node.x, node.y + size + 10);
@@ -196,7 +218,7 @@ const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({ gra
         cancelAnimationFrame(animationFrameId.current);
       }
     };
-  }, [graphData, hoveredNodeId, onNodeHover, onNodeClick]);
+  }, [graphData, hoveredNodeId, onNodeHover, onNodeClick, searchQuery]);
 
   return <canvas ref={canvasRef} className="graph-canvas" />;
 };

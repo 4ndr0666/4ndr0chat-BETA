@@ -27,16 +27,20 @@ const GraphTooltip: React.FC<GraphTooltipProps> = ({ node, position }) => {
       }}
     >
       <div className="tooltip-label">{node.label}</div>
-      <div className="space-y-1">
-        <div className="tooltip-stat">
-          <span className="tooltip-stat-label">Weight:</span>
-          <span>{node.weight.toFixed(2)}</span>
+      {node.type === 'summary' && node.summaryText ? (
+        <div className="tooltip-content">{node.summaryText}</div>
+      ) : (
+        <div className="space-y-1">
+          <div className="tooltip-stat">
+            <span className="tooltip-stat-label">Weight:</span>
+            <span>{node.weight.toFixed(2)}</span>
+          </div>
+          <div className="tooltip-stat">
+            <span className="tooltip-stat-label">Sentiment:</span>
+            <span className={sentimentColor}>{node.sentiment.toFixed(2)}</span>
+          </div>
         </div>
-        <div className="tooltip-stat">
-          <span className="tooltip-stat-label">Sentiment:</span>
-          <span className={sentimentColor}>{node.sentiment.toFixed(2)}</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 };

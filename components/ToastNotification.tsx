@@ -1,9 +1,9 @@
 import React from 'react';
-import { SaveIcon, MemoryWipeIcon } from './IconComponents';
+import { SaveIcon, MemoryWipeIcon, DistillIcon } from './IconComponents';
 
 interface ToastNotificationProps {
   message: string | null;
-  type?: 'success' | 'cleared';
+  type?: 'success' | 'cleared' | 'info';
 }
 
 const ToastNotification: React.FC<ToastNotificationProps> = ({ message, type = 'success' }) => {
@@ -11,8 +11,14 @@ const ToastNotification: React.FC<ToastNotificationProps> = ({ message, type = '
     return null;
   }
 
-  const typeClasses = type === 'success' ? 'success' : 'cleared';
-  const Icon = type === 'success' ? SaveIcon : MemoryWipeIcon;
+  const ICONS = {
+    success: SaveIcon,
+    cleared: MemoryWipeIcon,
+    info: DistillIcon
+  }
+
+  const typeClasses = type;
+  const Icon = ICONS[type] || SaveIcon;
 
   return (
     <div className={`toast-notification ${typeClasses}`}>
