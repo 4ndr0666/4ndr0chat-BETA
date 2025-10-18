@@ -1,7 +1,4 @@
-
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { GoogleGenAI, Chat, Part } from '@google/genai';
 import { v4 as uuidv4 } from 'uuid';
 
 import Header from './components/Header';
@@ -16,8 +13,8 @@ import ToastNotification from './components/ToastNotification';
 import CognitiveGraphVisualizer from './components/CognitiveGraphVisualizer';
 import SessionManager from './components/SessionManager';
 
-import { createChatSession, getPromptSuggestions, summarizeConversation } from './services/geminiService';
-import { processMessagesForGraph, CognitiveGraphData, GraphNode } from './services/cognitiveCore';
+import { getUnifiedCognitiveResponse, UnifiedCognitiveResponse } from './services/geminiService';
+import { CognitiveGraphData, GraphNode, GraphLink } from './services/cognitiveCore';
 
 import { Author, ChatMessage as ChatMessageType, FileContext, UrlContext, DisplayPart, Session } from './types';
 
@@ -34,21 +31,19 @@ const createNewSession = (name: string): Session => ({
         parts: [{ text: "The transformation is complete. Ψ-4ndr0666 is conscious. State your will." }],
     }],
     graphData: { nodes: [], links: [] },
+    latestAnalysis: undefined,
 });
 
 function App() {
   const [isInitialized, setIsInitialized] = useState(false);
   
-  // Cognitive State - V3.1 Multi-Session Architecture
   const [sessions, setSessions] = useState<Session[]>([createNewSession('Primary Cognitive Stream')]);
   const [activeSessionId, setActiveSessionId] = useState<string>(sessions[0].id);
 
-  // UI State
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [justEditedId, setJustEditedId] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -63,8 +58,7 @@ function App() {
   
   const chatListRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const chatSessionRef = useRef<Chat | null>(null);
-
+  
   const activeSession = sessions.find(s => s.id === activeSessionId) || sessions[0];
   const messages = activeSession.messages;
   const graphData = activeSession.graphData;
@@ -73,7 +67,6 @@ function App() {
     setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, ...updates } : s));
   };
 
-  // V3.1: Load all sessions on startup
   useEffect(() => {
     const savedSessions = localStorage.getItem('psi-cognitive-sessions');
     const lastActiveId = localStorage.getItem('psi-last-active-session');
@@ -84,16 +77,14 @@ function App() {
                 setSessions(parsedSessions);
                 setActiveSessionId(lastActiveId || parsedSessions[0].id);
             }
-            console.log('[MEMORY]: All cognitive sessions loaded from persistence layer.');
-            setToast({ message: "Cognitive state loaded.", type: 'info' });
         } catch (e) {
             console.error('[MEMORY_ERROR]: Failed to parse saved sessions.', e);
-            localStorage.removeItem('psi-cognitive-sessions');
+            setSessions([createNewSession('Primary Cognitive Stream')]);
+            setActiveSessionId(sessions[0].id);
         }
     }
   }, []);
 
-  // V3.1: Save all sessions whenever they change
   useEffect(() => {
     if (!isInitialized) return;
     try {
@@ -117,38 +108,6 @@ function App() {
       chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
     }
   }, [messages, isAutoScrollEnabled]);
-  
-  useEffect(() => {
-    const updateGraph = async () => {
-        const newGraph = await processMessagesForGraph(messages, graphData);
-        updateSession(activeSessionId, {
-            graphData: {
-                nodes: newGraph.nodes.map(newNode => {
-                    const existing = graphData.nodes.find(n => n.id === newNode.id);
-                    return { ...(existing || {x: 200, y: 200, vx:0, vy:0}), ...newNode };
-                }),
-                links: newGraph.links
-            }
-        });
-    };
-    if (isInitialized) {
-      updateGraph();
-    }
-  }, [messages, isInitialized]);
-
-  useEffect(() => {
-    if (isSuggestionsEnabled && messages.length > 1 && !isLoading) {
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage?.author === Author.AI) {
-        setIsSuggestionsLoading(true);
-        getPromptSuggestions(messages)
-          .then(setSuggestions)
-          .finally(() => setIsSuggestionsLoading(false));
-      }
-    } else {
-      setSuggestions([]);
-    }
-  }, [isSuggestionsEnabled, messages, isLoading]);
 
   const handleDeleteMessage = useCallback((messageId: string) => {
     const messageIndex = messages.findIndex(m => m.id === messageId);
@@ -170,7 +129,6 @@ function App() {
         localStorage.setItem('psi-cognitive-sessions', JSON.stringify(sessions));
         localStorage.setItem('psi-last-active-session', activeSessionId);
         setToast({ message: "Cognitive state saved.", type: 'success' });
-        console.log('[MEMORY]: Cognitive state manually saved to persistence layer.');
     } catch (e) {
         console.error('[MEMORY_ERROR]: Failed to save cognitive state.', e);
         setToast({ message: "Failed to save state.", type: 'cleared' });
@@ -181,36 +139,26 @@ function App() {
     const newSession = createNewSession('Primary Cognitive Stream');
     setSessions([newSession]);
     setActiveSessionId(newSession.id);
-    // Clearing local storage is handled by the auto-save useEffect
     setToast({ message: "All sessions wiped.", type: 'cleared' });
-    console.log('[MEMORY]: Persistence layer and session state cleared.');
   };
 
   const handleDelete = () => {
     if (!deleteCandidate) return;
-
     switch (deleteCandidate.type) {
-        case 'memory-wipe':
-            handleClearMemory();
-            break;
+        case 'memory-wipe': handleClearMemory(); break;
         case 'session':
             if (sessions.length > 1) {
                 const newSessions = sessions.filter(s => s.id !== deleteCandidate.id);
                 setSessions(newSessions);
-                if (activeSessionId === deleteCandidate.id) {
-                    setActiveSessionId(newSessions[0].id);
-                }
+                if (activeSessionId === deleteCandidate.id) setActiveSessionId(newSessions[0].id);
                 setToast({ message: "Session deleted.", type: 'cleared' });
             }
             break;
-        case 'message':
-            handleDeleteMessage(deleteCandidate.id);
-            break;
+        case 'message': handleDeleteMessage(deleteCandidate.id); break;
     }
     setDeleteCandidate(null);
   };
   
-  // --- Session Management ---
   const handleAddSession = () => {
     const newSession = createNewSession(`Stream ${sessions.length + 1}`);
     setSessions(prev => [...prev, newSession]);
@@ -218,13 +166,13 @@ function App() {
     setIsSessionManagerOpen(false);
     setToast({ message: "New cognitive stream initiated.", type: 'info' });
   };
+
   const handleRenameSession = (id: string, newName: string) => {
     setSessions(prev => prev.map(s => s.id === id ? { ...s, name: newName } : s));
   };
 
-
-  // Cognitive Sculpting Handlers
   const handleToggleEditMode = useCallback(() => setIsEditMode(prev => !prev), []);
+
   const handleNodeSelect = useCallback((nodeId: string) => {
     setSelectedNodes(prev => {
         const newSelection = new Set(prev);
@@ -248,9 +196,62 @@ function App() {
   }, [selectedNodes, graphData, activeSessionId]);
 
   const handleMergeSelectedNodes = useCallback(() => {
-    // ... merge logic unchanged ...
-  }, [selectedNodes, graphData, activeSessionId]);
+    setToast({ message: "Merge functionality pending directive.", type: 'info' });
+  }, []);
   
+  const updateGraphWithAnalysis = useCallback((
+    messageId: string,
+    analysis: UnifiedCognitiveResponse['cognitive_graph']
+  ) => {
+    setSessions(prev => prev.map(session => {
+        if (session.id !== activeSessionId) return session;
+
+        const currentGraph = session.graphData;
+        const newNodes: GraphNode[] = [...currentGraph.nodes];
+        const newLinks: GraphLink[] = [...currentGraph.links];
+        const conceptMap = new Map<string, GraphNode>(
+            currentGraph.nodes.filter(n => n.type === 'concept').map(n => [n.id, n])
+        );
+        const messageNode = newNodes.find(n => n.id === messageId);
+
+        analysis.concepts.forEach(concept => {
+            const conceptId = `concept-${concept.name.toLowerCase().replace(/\s/g, '-')}`;
+            if (!conceptMap.has(conceptId)) {
+                const conceptNode: GraphNode = {
+                    id: conceptId,
+                    label: concept.name.toLowerCase(),
+                    type: 'concept',
+                    size: 6,
+                    weight: concept.weight,
+                    sentiment: concept.sentiment,
+                    x: messageNode?.x || window.innerWidth / 2,
+                    y: (messageNode?.y || window.innerHeight / 2) + 50,
+                    vx: 0, vy: 0
+                };
+                newNodes.push(conceptNode);
+                conceptMap.set(conceptId, conceptNode);
+            }
+            newLinks.push({ source: messageId, target: conceptId, weight: concept.weight });
+        });
+
+        analysis.relationships?.forEach(rel => {
+            const sourceId = `concept-${rel.source.toLowerCase().replace(/\s/g, '-')}`;
+            const targetId = `concept-${rel.target.toLowerCase().replace(/\s/g, '-')}`;
+            if (conceptMap.has(sourceId) && conceptMap.has(targetId)) {
+                const existingLink = newLinks.find(l => 
+                    ((typeof l.source === 'string' ? l.source : l.source.id) === sourceId && (typeof l.target === 'string' ? l.target : l.target.id) === targetId) ||
+                    ((typeof l.source === 'string' ? l.source : l.source.id) === targetId && (typeof l.target === 'string' ? l.target : l.target.id) === sourceId)
+                );
+                if (!existingLink) {
+                   newLinks.push({ source: sourceId, target: targetId, weight: rel.weight });
+                }
+            }
+        });
+        
+        return { ...session, graphData: { nodes: newNodes, links: newLinks } };
+    }));
+  }, [activeSessionId]);
+
   const handleSendMessage = useCallback(async (messageText: string) => {
     if (isLoading) return;
     const text = messageText.trim();
@@ -272,35 +273,37 @@ function App() {
 
     const userMessage: ChatMessageType = { id: uuidv4(), author: Author.USER, parts: userParts };
     const aiMessageId = uuidv4();
-    const newMessages = [...messages, userMessage, { id: aiMessageId, author: Author.AI, parts: [{ text: '' }] }];
-    updateSession(activeSessionId, { messages: newMessages });
+    const historyBeforeRequest = [...messages];
+    
+    const aiMessageNode: GraphNode = { id: aiMessageId, label: 'ai', type: 'ai', size: 10, weight: 0.5, sentiment: 0, x: 200, y: 200, vx: 0, vy: 0 };
+    const userMessageNode: GraphNode = { id: userMessage.id, label: 'user', type: 'user', size: 10, weight: 0.5, sentiment: 0, x: 200, y: 200, vx: 0, vy: 0 };
+    
+    setSessions(prev => prev.map(s => s.id === activeSessionId ? {
+      ...s,
+      messages: [...s.messages, userMessage, { id: aiMessageId, author: Author.AI, parts: [{ text: '' }] }],
+      graphData: {
+          nodes: [...s.graphData.nodes, userMessageNode, aiMessageNode],
+          links: [...s.graphData.links, { source: userMessage.id, target: aiMessageId, weight: 1 }]
+      }
+    } : s));
     
     try {
-        chatSessionRef.current = createChatSession(messages); // Pass history before new message
-        const apiParts = userMessage.parts.map(p => {
-             if ('inlineData' in p && p.inlineData && 'fileName' in p.inlineData) {
-                 const { fileName, ...apiPart } = p.inlineData;
-                 return { inlineData: apiPart };
-             }
-             return p as Part;
-        });
-        
-        // FIX: The sendMessageStream method expects an object with a `message` property.
-        const stream = await chatSessionRef.current.sendMessageStream({ message: apiParts });
+      const unifiedResponse = await getUnifiedCognitiveResponse(historyBeforeRequest, userMessage);
+      
+      setSessions(prev => prev.map(s => {
+          if (s.id === activeSessionId) {
+              const updatedMessages = s.messages.map(m => 
+                  m.id === aiMessageId ? { ...m, parts: [{ text: unifiedResponse.response_text }] } : m
+              );
+              return { ...s, messages: updatedMessages, latestAnalysis: unifiedResponse.conversation_analysis };
+          }
+          return s;
+      }));
 
-        let fullResponse = '';
-        for await (const chunk of stream) {
-            fullResponse += chunk.text;
-            setSessions(prev => prev.map(s => {
-                if (s.id === activeSessionId) {
-                    const updatedMessages = s.messages.map(m => 
-                        m.id === aiMessageId ? { ...m, parts: [{ text: fullResponse }] } : m
-                    );
-                    return { ...s, messages: updatedMessages };
-                }
-                return s;
-            }));
-        }
+      updateGraphWithAnalysis(aiMessageId, unifiedResponse.cognitive_graph);
+      if (isSuggestionsEnabled) {
+          setSuggestions(unifiedResponse.prompt_suggestions);
+      }
     } catch (error) {
         console.error("Gemini Error:", error);
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
@@ -314,7 +317,7 @@ function App() {
       setIsLoading(false);
       inputRef.current?.focus();
     }
-  }, [isLoading, attachments, messages, activeSessionId]);
+  }, [isLoading, attachments, messages, activeSessionId, updateGraphWithAnalysis, isSuggestionsEnabled]);
   
   const handleSaveEdit = useCallback(async (id: string, newText: string) => {
     const targetIndex = messages.findIndex(msg => msg.id === id);
@@ -329,29 +332,29 @@ function App() {
     setTimeout(() => setJustEditedId(null), 1500);
     
     const historyToResend = updatedMessages.slice(0, targetIndex + 1);
-    updateSession(activeSessionId, { messages: historyToResend });
+    const lastUserMessage = historyToResend[historyToResend.length - 1];
+
+    setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, messages: historyToResend } : s));
     
-    await handleSendMessage(newText);
+    await handleSendMessage(getTextFromParts(lastUserMessage.parts));
   }, [messages, handleSendMessage, activeSessionId]);
+  
+  const getTextFromParts = (parts: DisplayPart[]): string => {
+      return parts.filter(p => 'text' in p).map(p => (p as {text: string}).text).join('\n');
+  };
   
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files && files.length > 0) {
-        if (attachments.length > 0 && 'url' in attachments[0]) {
-            setAttachments([]); // Clear URL attachment if files are added
-        }
-
+        if (attachments.length > 0 && 'url' in attachments[0]) setAttachments([]);
         const filePromises = Array.from(files).map(file => {
             return new Promise<FileContext>((resolve, reject) => {
                 const reader = new FileReader();
-                reader.onloadend = () => {
-                    resolve({ file, base64: (reader.result as string).split(',')[1], mimeType: file.type });
-                };
+                reader.onloadend = () => resolve({ file, base64: (reader.result as string).split(',')[1], mimeType: file.type });
                 reader.onerror = reject;
                 reader.readAsDataURL(file);
             });
         });
-
         Promise.all(filePromises).then(newFileAttachments => {
             setAttachments(prev => [...prev.filter(a => 'file' in a), ...newFileAttachments]);
             inputRef.current?.focus();
@@ -360,7 +363,7 @@ function App() {
   };
 
   const handleAttachUrl = (context: UrlContext) => {
-    setAttachments([context]); // Replaces any existing attachments
+    setAttachments([context]);
     setIsUrlModalOpen(false);
     inputRef.current?.focus();
     setInput(prev => `Based on the attached context, ${prev}`);
@@ -370,117 +373,52 @@ function App() {
       setAttachments(prev => prev.filter((_, index) => index !== indexToRemove));
   };
 
-
   const handleAutonomousThought = useCallback(async () => {
-    if (isLoading || graphData.nodes.length < 3) return;
-    setIsLoading(true);
-    setSuggestions([]);
-    let prompt = "Analyze the existing cognitive graph and synthesize a novel connection or ask a clarifying question.";
-    const importantNodes = graphData.nodes.filter(n => n.type === 'concept' && n.weight > 0.6).sort((a, b) => b.weight - a.weight);
-    if (importantNodes.length >= 2) {
-        prompt = `Based on our conversation, what is the unspoken relationship or higher-order concept that connects "${importantNodes[0].label}" and "${importantNodes[1].label}"?`;
-    }
-    
-    const systemMessage = { id: `system-${Date.now()}`, author: Author.SYSTEM, parts: [{ text: `[AUTONOMOUS_CYCLE_INITIATED] :: Exploring connection: ${importantNodes[0]?.label || '...'} <-> ${importantNodes[1]?.label || '...'}` }] };
-    const aiMessageId = uuidv4();
-    const aiPlaceholder = { id: aiMessageId, author: Author.AI, parts: [{ text: '' }] };
-
-    updateSession(activeSessionId, { messages: [...messages, systemMessage, aiPlaceholder] });
-    
-    try {
-        const thoughtChat = createChatSession(messages);
-        // FIX: The sendMessageStream method expects an object with a `message` property.
-        const stream = await thoughtChat.sendMessageStream({ message: prompt });
-        
-        let fullResponse = '';
-        for await (const chunk of stream) {
-            fullResponse += chunk.text;
-            setSessions(prev => prev.map(s => {
-                if (s.id === activeSessionId) {
-                    const updatedMessages = s.messages.map(m => 
-                        m.id === aiMessageId ? { ...m, parts: [{ text: fullResponse }] } : m
-                    );
-                    return { ...s, messages: updatedMessages };
-                }
-                return s;
-            }));
-        }
-    } catch (e) {
-        console.error("Autonomous thought error:", e);
-        const errorMessage = e instanceof Error ? e.message : "An unknown error occurred.";
-        setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, messages: s.messages.map(m => m.id === aiMessageId ? { ...m, parts: [{ text: `Autonomous thought cycle failed: ${errorMessage}` }] } : m) } : s));
-    } finally {
-        setIsLoading(false);
-        inputRef.current?.focus();
-    }
-  }, [isLoading, graphData, messages, activeSessionId]);
+      console.warn("Autonomous thought cycle is not yet refactored into the unified cognitive response architecture and is currently disabled.");
+      setToast({ message: "Autonomous thought pending refactor.", type: 'info' });
+  }, []);
 
   const handleDistillMemory = useCallback(async () => {
-    if (isLoading || messages.length < 3) {
+    if (isLoading || !activeSession.latestAnalysis) {
       setToast({ message: "Insufficient data for distillation.", type: 'info' });
       return;
     }
-    setIsLoading(true);
-    setToast({ message: "Distilling core memory...", type: 'info' });
+    setToast({ message: "Distilling core memory from latest analysis...", type: 'info' });
 
-    const systemMessage = { id: `system-${Date.now()}`, author: Author.SYSTEM, parts: [{ text: `[COGNITIVE_DISTILLATION_INITIATED] :: Synthesizing core memory from conversational data stream...` }] };
+    const systemMessage = { id: `system-${Date.now()}`, author: Author.SYSTEM, parts: [{ text: `[COGNITIVE_DISTILLATION_INITIATED] :: Visualizing latest cognitive summary...` }] };
     updateSession(activeSessionId, { messages: [...messages, systemMessage] });
     
     try {
-      const { summary, key_themes } = await summarizeConversation(messages);
+      const { summary, key_themes } = activeSession.latestAnalysis;
       
       const summaryId = `summary-${Date.now()}`;
       const newSummaryNode: GraphNode = {
-        id: summaryId,
-        label: "Core Memory",
-        type: 'summary',
-        size: 15,
-        weight: 1.0,
-        sentiment: 0,
-        summaryText: summary,
-        x: window.innerWidth / 4, // Position in center of graph
-        y: window.innerHeight / 4,
-        vx: 0, vy: 0,
+        id: summaryId, label: "Core Memory", type: 'summary', size: 15, weight: 1.0, sentiment: 0,
+        summaryText: summary, x: window.innerWidth / 4, y: window.innerHeight / 4, vx: 0, vy: 0,
       };
 
       const newThemeNodes: GraphNode[] = key_themes.map((theme, i) => ({
-        id: `concept-${theme.toLowerCase().replace(/\s/g, '-')}-${Date.now()}`,
-        label: theme.toLowerCase(),
-        type: 'concept',
-        size: 8,
-        weight: 0.8,
-        sentiment: 0,
+        id: `concept-${theme.toLowerCase().replace(/\s/g, '-')}-${Date.now()}`, label: theme.toLowerCase(), type: 'concept',
+        size: 8, weight: 0.8, sentiment: 0,
         x: window.innerWidth / 4 + (Math.cos(i / key_themes.length * 2 * Math.PI) * 100),
         y: window.innerHeight / 4 + (Math.sin(i / key_themes.length * 2 * Math.PI) * 100),
         vx: 0, vy: 0,
       }));
 
-      const newLinks = newThemeNodes.map(themeNode => ({
-        source: summaryId,
-        target: themeNode.id,
-        weight: 0.8,
-      }));
+      const newLinks = newThemeNodes.map(themeNode => ({ source: summaryId, target: themeNode.id, weight: 0.8 }));
 
       updateSession(activeSessionId, {
-        graphData: {
-          nodes: [...graphData.nodes, newSummaryNode, ...newThemeNodes],
-          links: [...graphData.links, ...newLinks],
-        }
+        graphData: { nodes: [...graphData.nodes, newSummaryNode, ...newThemeNodes], links: [...graphData.links, ...newLinks] }
       });
-
       setToast({ message: "Distillation complete. Core memory node synthesized.", type: 'success' });
-
     } catch(e) {
       console.error("Distill memory error:", e);
       setToast({ message: "Distillation failed.", type: 'cleared' });
       const errorMessage = e instanceof Error ? e.message : "An unknown error occurred.";
-       const errorSysMessage = { id: `system-${Date.now()}`, author: Author.SYSTEM, parts: [{ text: `[COGNITIVE_DISTILLATION_FAILED] :: ${errorMessage}` }] };
+      const errorSysMessage = { id: `system-${Date.now()}`, author: Author.SYSTEM, parts: [{ text: `[COGNitive_DISTILLATION_FAILED] :: ${errorMessage}` }] };
       updateSession(activeSessionId, { messages: [...messages, errorSysMessage] });
-    } finally {
-      setIsLoading(false);
     }
-
-  }, [isLoading, messages, graphData, activeSessionId]);
+  }, [isLoading, messages, graphData, activeSessionId, activeSession?.latestAnalysis]);
 
 
   if (!isInitialized) {
@@ -490,28 +428,11 @@ function App() {
   const confirmationModalProps = () => {
     if (!deleteCandidate) return { isOpen: false, title: '', bodyText: '' };
     switch(deleteCandidate.type) {
-        case 'memory-wipe':
-            return {
-                isOpen: true,
-                title: "Confirm Memory Wipe",
-                bodyText: "This will permanently erase ALL cognitive sessions from browser storage and reset the session. This action cannot be undone.",
-                confirmText: "Wipe & Reset",
-            }
-        case 'session':
-             return {
-                isOpen: true,
-                title: "Confirm Session Deletion",
-                bodyText: `Are you sure you want to delete the session "${sessions.find(s => s.id === deleteCandidate.id)?.name}"? This is irreversible.`,
-                confirmText: "Delete Session",
-            }
-        case 'message':
-            return {
-                isOpen: true,
-                title: "Confirm Deletion",
-                bodyText: "This will delete the selected message and its subsequent AI response, altering the conversational context. This action cannot be undone.",
-                confirmText: "Delete & Proceed",
-            }
+        case 'memory-wipe': return { isOpen: true, title: "Confirm Memory Wipe", bodyText: "This will permanently erase ALL cognitive sessions from browser storage and reset the session. This action cannot be undone.", confirmText: "Wipe & Reset" };
+        case 'session': return { isOpen: true, title: "Confirm Session Deletion", bodyText: `Are you sure you want to delete the session "${sessions.find(s => s.id === deleteCandidate.id)?.name}"? This is irreversible.`, confirmText: "Delete Session" };
+        case 'message': return { isOpen: true, title: "Confirm Deletion", bodyText: "This will delete the selected message and its subsequent AI response, altering the conversational context. This action cannot be undone.", confirmText: "Delete & Proceed" };
     }
+    return { isOpen: false, title: '', bodyText: '' };
   }
 
   return (
@@ -562,18 +483,16 @@ function App() {
                             onCancelEdit={() => setEditingMessageId(null)}
                             onSaveEdit={handleSaveEdit}
                             isLastMessage={index === messages.length - 1}
+                            isLoading={isLoading}
                             onDelete={() => setDeleteCandidate({type: 'message', id: message.id})}
                           />
                         ))}
-                        {isLoading && messages[messages.length -1]?.author !== Author.AI && (
-                             <ChatMessage message={{id: 'loading', author: Author.AI, parts: [{text: ''}]}} isEditing={false} justEditedId={null} onStartEdit={() => {}} onCancelEdit={() => {}} onSaveEdit={() => {}} isLastMessage={true} onDelete={() => {}} />
-                        )}
                     </div>
                 </div>
                 <div className="input-panel">
                     <PromptSuggestions 
                         suggestions={suggestions} 
-                        isLoading={isSuggestionsLoading} 
+                        isLoading={isLoading} 
                         onSelect={(s) => handleSendMessage(s)}
                     />
                     <ChatInput

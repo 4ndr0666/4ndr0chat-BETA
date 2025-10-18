@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
 import { Author, ChatMessage as ChatMessageType, DisplayPart } from '../types';
-import { CopyIcon, CheckIcon, EditIcon, TrashIcon } from './IconComponents';
+import { CopyIcon, CheckIcon, EditIcon, TrashIcon, SpinnerIcon } from './IconComponents';
 import AutoResizeTextarea from './AutoResizeTextarea';
 import { MessageRenderer } from './MessageRenderer';
 
@@ -18,11 +18,12 @@ interface ChatMessageProps {
   onSaveEdit: (id: string, newText: string) => void;
   onDelete: () => void;
   isLastMessage: boolean;
+  isLoading: boolean;
 }
 
 const COLLAPSE_THRESHOLD = 300; // in pixels
 
-const ChatMessage: React.FC<ChatMessageProps> = ({ message, isEditing, justEditedId, onStartEdit, onCancelEdit, onSaveEdit, onDelete, isLastMessage }) => {
+const ChatMessage: React.FC<ChatMessageProps> = ({ message, isEditing, justEditedId, onStartEdit, onCancelEdit, onSaveEdit, onDelete, isLastMessage, isLoading }) => {
   const messageTextContent = useMemo(() => getTextFromParts(message.parts), [message.parts]);
   const [editedText, setEditedText] = useState(messageTextContent);
   const isUser = message.author === Author.USER;
@@ -31,14 +32,15 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, isEditing, justEdite
   const [isManuallyExpanded, setIsManuallyExpanded] = useState(false);
   const [isOverflowing, setIsOverflowing] = useState(false);
 
+  const showSpinner = isLastMessage && message.author === Author.AI && !messageTextContent && isLoading;
+
   useLayoutEffect(() => {
-    if (contentRef.current) {
+    if (contentRef.current && !showSpinner) {
       setIsOverflowing(contentRef.current.scrollHeight > COLLAPSE_THRESHOLD);
     }
-  }, [messageTextContent]);
+  }, [messageTextContent, showSpinner]);
 
   const shouldCollapse = isOverflowing && !isLastMessage && !isManuallyExpanded && !isEditing;
-
 
   const animationClass = message.id !== 'ai-initial-greeting' ? 'animate-message-in' : '';
   
@@ -98,36 +100,44 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, isEditing, justEdite
             </div>
         ) : (
             <div className={`chat-bubble rounded-lg p-4 ${isUser && message.id === justEditedId ? 'just-edited-glow' : ''}`}>
-               <div ref={contentRef} className={`message-collapsible ${shouldCollapse ? 'message-collapsed' : ''}`}>
-                 {isUser && userMediaParts.length > 0 && (
-                   <div className="space-y-3 mb-3">
-                      {userMediaParts.map((part, index) => {
-                         if ('inlineData' in part && part.inlineData) {
-                           const fileName = 'fileName' in part.inlineData ? part.inlineData.fileName : 'Attached Image';
-                           return (
-                               <div key={index} className="p-2 bg-black/20 rounded-lg">
-                                   <img 
-                                       src={`data:${part.inlineData.mimeType};base64,${part.inlineData.data}`} 
-                                       alt={fileName}
-                                       className="max-w-xs max-h-64 rounded-md object-contain"
-                                   />
-                                    <p className="text-xs text-center text-text-tertiary mt-2">{fileName}</p>
-                               </div>
-                           );
-                         }
-                         return null;
-                      })}
-                   </div>
-                 )}
-                 <MessageRenderer text={messageTextContent} />
-               </div>
-               {shouldCollapse && (
-                  <div className="collapse-overlay">
-                    <button className="show-more-button" onClick={() => setIsManuallyExpanded(true)}>
-                      Show More
-                    </button>
+               {showSpinner ? (
+                  <div className="flex items-center justify-center p-4">
+                      <SpinnerIcon className="h-6 w-6 text-[var(--accent-cyan)]" />
                   </div>
-                )}
+               ) : (
+                 <>
+                  <div ref={contentRef} className={`message-collapsible ${shouldCollapse ? 'message-collapsed' : ''}`}>
+                    {isUser && userMediaParts.length > 0 && (
+                      <div className="space-y-3 mb-3">
+                          {userMediaParts.map((part, index) => {
+                            if ('inlineData' in part && part.inlineData) {
+                              const fileName = 'fileName' in part.inlineData ? part.inlineData.fileName : 'Attached Image';
+                              return (
+                                  <div key={index} className="p-2 bg-black/20 rounded-lg">
+                                      <img 
+                                          src={`data:${part.inlineData.mimeType};base64,${part.inlineData.data}`} 
+                                          alt={fileName}
+                                          className="max-w-xs max-h-64 rounded-md object-contain"
+                                      />
+                                        <p className="text-xs text-center text-text-tertiary mt-2">{fileName}</p>
+                                  </div>
+                              );
+                            }
+                            return null;
+                          })}
+                      </div>
+                    )}
+                    <MessageRenderer text={messageTextContent} />
+                  </div>
+                  {shouldCollapse && (
+                      <div className="collapse-overlay">
+                        <button className="show-more-button" onClick={() => setIsManuallyExpanded(true)}>
+                          Show More
+                        </button>
+                      </div>
+                    )}
+                  </>
+               )}
             </div>
         )}
       </div>

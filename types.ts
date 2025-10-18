@@ -35,4 +35,5 @@ export interface Session {
   createdAt: string;
   messages: ChatMessage[];
   graphData: CognitiveGraphData;
+  latestAnalysis?: { summary: string; key_themes: string[] };
 }
