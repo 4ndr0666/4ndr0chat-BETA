@@ -1315,6 +1315,16 @@
         padding: 0.1rem 0.25rem;
       }
 
+      @keyframes pulse-indicator {
+        0%, 100% {
+          transform: scale(1);
+          opacity: 0.8;
+        }
+        50% {
+          transform: scale(1.2);
+          opacity: 1;
+        }
+      }
 
       /* THEMING UTILITY CLASSES */
       .text-error { color: var(--error-text); }

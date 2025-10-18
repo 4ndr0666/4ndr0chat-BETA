@@ -46,6 +46,7 @@ export const AutoScrollOffIcon: React.FC<IconProps> = ({ className }) => (
   </svg>
 );
 
+// FIX: Added quotes to SVG path attributes to fix JSX parsing errors.
 export const SuggestionsOnIcon: React.FC<IconProps> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
         <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
@@ -132,4 +133,11 @@ export const MergeIcon: React.FC<IconProps> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 19c-3.314 0-6-2.686-6-6s2.686-6 6-6m0 0v12m0-12c3.314 0 6 2.686 6 6s-2.686 6-6 6m0-12h3.5a5.5 5.5 0 015.5 5.5V12M9 12H5.5A5.5 5.5 0 000 6.5V6" />
     </svg>
+);
+
+export const StatusIndicatorIcon: React.FC = () => (
+    <span className="absolute -top-1 -right-1 flex h-3 w-3">
+        <span className="animate-[pulse-indicator_1.5s_ease-in-out_infinite] absolute inline-flex h-full w-full rounded-full bg-[var(--accent-cyan)] opacity-75"></span>
+        <span className="relative inline-flex rounded-full h-3 w-3 bg-[var(--accent-cyan-mid)]"></span>
+    </span>
 );

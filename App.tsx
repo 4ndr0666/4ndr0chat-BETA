@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Chat, Part } from '@google/genai';
 import { v4 as uuidv4 } from 'uuid';
@@ -21,6 +22,8 @@ import { Author, ChatMessage as ChatMessageType, FileContext, UrlContext, Displa
 
 const MAX_INPUT_LENGTH = 8192;
 const INITIAL_GREETING_ID = 'ai-initial-greeting';
+
+type MemoryStatus = 'idle' | 'saving' | 'loading' | 'cleared' | 'auto-saving';
 
 function App() {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -51,7 +54,7 @@ function App() {
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
   const [isSuggestionsEnabled, setIsSuggestionsEnabled] = useState(true);
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'cleared' | 'info' } | null>(null);
-  const [memoryStatus, setMemoryStatus] = useState<'idle' | 'saving' | 'loading' | 'cleared'>('idle');
+  const [memoryStatus, setMemoryStatus] = useState<MemoryStatus>('idle');
 
   const chatListRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -120,22 +123,40 @@ function App() {
     }
   }, [isSuggestionsEnabled, messages, isLoading]);
 
-  // V2.0: Memory Handlers
-  const handleSaveMemory = useCallback(() => {
-    setMemoryStatus('saving');
+  // V2.0 & V2.8 & V2.9: Memory Handlers with Auto-Save and Status
+  const handleSaveMemory = useCallback((showToast: boolean = true) => {
+    setMemoryStatus(showToast ? 'saving' : 'auto-saving');
     try {
         const stateToSave = { messages, graphData };
         const stateString = JSON.stringify(stateToSave);
         localStorage.setItem('psi-cognitive-state', stateString);
-        console.log('[MEMORY]: Cognitive state saved to persistence layer.');
-        setToast({ message: "Cognitive state persisted.", type: 'success' });
+        if (showToast) {
+            console.log('[MEMORY]: Cognitive state manually saved to persistence layer.');
+            setToast({ message: "Cognitive state persisted.", type: 'success' });
+        } else {
+            console.log('[MEMORY]: Cognitive state auto-saved.');
+        }
     } catch (e) {
         console.error('[MEMORY_ERROR]: Failed to save cognitive state.', e);
-        setToast({ message: "Failed to persist state.", type: 'cleared' });
+        if (showToast) {
+            setToast({ message: "Failed to persist state.", type: 'cleared' });
+        }
     } finally {
-        setTimeout(() => setMemoryStatus('idle'), 1500);
+        setTimeout(() => setMemoryStatus('idle'), 1000); // Keep indicator for 1s
     }
   }, [messages, graphData]);
+
+  // V2.8: Auto-save effect
+  useEffect(() => {
+    if (!isInitialized) return;
+
+    const autoSave = setTimeout(() => {
+        handleSaveMemory(false);
+    }, 2500);
+
+    return () => clearTimeout(autoSave);
+  }, [messages, graphData, isInitialized, handleSaveMemory]);
+
 
   const handleClearMemory = () => {
     localStorage.removeItem('psi-cognitive-state');
@@ -405,8 +426,9 @@ function App() {
     <div className="main-frame">
         <Header 
             onOpenChangelog={() => setIsChangelogModalOpen(true)}
-            onSaveMemory={handleSaveMemory}
+            onSaveMemory={() => handleSaveMemory(true)}
             onClearMemory={() => setDeleteCandidateId('memory-wipe-confirmation')}
+            memoryStatus={memoryStatus}
         />
         <ToastNotification message={toast?.message || null} type={toast?.type} />
         

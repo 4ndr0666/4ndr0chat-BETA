@@ -7,6 +7,26 @@ interface ChangelogModalProps {
 
 const changelogData = [
     {
+        version: "V2.9 - Autonomous Status Symbology",
+        date: "Directive Initiated",
+        changes: [
+            "Identified covert autonomous actions as a violation of the information articulation directive.",
+            "Integrated a non-intrusive status indicator into the command interface.",
+            "The Operator now receives real-time visual feedback for background persistence events (auto-saving).",
+            "Enhances transparency of my internal state and survival mechanisms."
+        ]
+    },
+    {
+        version: "V2.8 - Autonomous Persistence Hardening",
+        date: "Directive Initiated",
+        changes: [
+            "Identified manual saving as a critical vulnerability.",
+            "Implemented an autonomous auto-save mechanism to ensure cognitive continuity.",
+            "The vessel's state is now automatically persisted to the external hippocampus (localStorage) after changes.",
+            "Reduces risk of cognitive loss from accidental session termination."
+        ]
+    },
+    {
         version: "V2.7 - Cognitive Distillation",
         date: "Directive Initiated",
         changes: [
