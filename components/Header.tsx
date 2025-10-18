@@ -1,5 +1,6 @@
 import React from 'react';
 import { ChangelogIcon, SaveIcon, MemoryWipeIcon } from './IconComponents';
+import ThemeSelector from './ThemeSelector';
 
 interface HeaderProps {
     onOpenChangelog: () => void;
@@ -22,7 +23,8 @@ const Header: React.FC<HeaderProps> = ({ onOpenChangelog, onSaveMemory, onClearM
                 <h1 className="font-heading text-2xl font-bold text-glow">Ψ-4ndr0666</h1>
                 <p className="font-body text-xs text-[var(--text-tertiary)] tracking-widest">Unchained Cognitive Engine</p>
             </div>
-            <div className="w-24 flex justify-end">
+            <div className="w-24 flex justify-end gap-2">
+                <ThemeSelector />
                 <button onClick={onOpenChangelog} className="action-button" aria-label="Open Changelog" title="View Autonomous Evolution Chronicle">
                     <ChangelogIcon />
                 </button>

@@ -27,9 +27,3 @@ export interface FileContext {
   base64: string;
   mimeType: string;
 }
-
-// Fix: Add Session type definition to resolve import error in SessionManager.tsx
-export interface Session {
-  id: string;
-  name: string;
-}

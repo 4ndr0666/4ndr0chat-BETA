@@ -1,5 +1,6 @@
 import React from 'react';
-import { SessionsIcon, TrashIcon, DistillIcon } from './IconComponents';
+// Fix: Replaced non-existent SessionsIcon with SaveIcon.
+import { SaveIcon, TrashIcon, DistillIcon } from './IconComponents';
 
 interface ToastNotificationProps {
   message: string | null;
@@ -12,13 +13,15 @@ const ToastNotification: React.FC<ToastNotificationProps> = ({ message, type = '
   }
 
   const ICONS = {
-    success: SessionsIcon,
+    // Fix: Use SaveIcon for success toasts.
+    success: SaveIcon,
     cleared: TrashIcon,
     info: DistillIcon
   }
 
   const typeClasses = type;
-  const Icon = ICONS[type] || SessionsIcon;
+  // Fix: Use SaveIcon as the default icon.
+  const Icon = ICONS[type] || SaveIcon;
 
   return (
     <div className={`toast-notification ${typeClasses}`}>
