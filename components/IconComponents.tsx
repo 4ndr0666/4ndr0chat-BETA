@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 type IconProps = {
@@ -110,9 +109,8 @@ export const SplashScreenGlyphIcon: React.FC<IconProps> = ({ className }) => (
             <circle cx="100" cy="100" r="50" strokeWidth="2" />
         </g>
         <g className="glyph-core-psi" strokeWidth="10">
-            <path d="M100 70 V 130" />
-            <path d="M100 70 C 80 70, 75 90, 75 100" />
-            <path d="M100 70 C 120 70, 125 90, 125 100" />
+            <path d="M100 140 V 100" />
+            <path d="M70 65 C 70 105, 130 105, 130 65" />
         </g>
     </svg>
 );
