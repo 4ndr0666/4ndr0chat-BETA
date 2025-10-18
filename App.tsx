@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Chat, Part } from '@google/genai';
 import { v4 as uuidv4 } from 'uuid';
@@ -149,33 +150,6 @@ function App() {
     }
   }, [isSuggestionsEnabled, messages, isLoading]);
 
-  const streamTextToSession = useCallback((sessionId: string, messageId: string, fullText: string, onComplete: () => void) => {
-    let currentIndex = 0;
-    const typingSpeed = 20;
-
-    const interval = setInterval(() => {
-        const partialText = fullText.substring(0, currentIndex + 1);
-        
-        setSessions(prev => prev.map(s => {
-            if (s.id === sessionId) {
-                const newMessages = [...s.messages];
-                const msgIndex = newMessages.findIndex(m => m.id === messageId);
-                if (msgIndex !== -1) {
-                    newMessages[msgIndex] = { ...newMessages[msgIndex], parts: [{ text: partialText }] };
-                    return { ...s, messages: newMessages };
-                }
-            }
-            return s;
-        }));
-
-        currentIndex++;
-        if (currentIndex > fullText.length) {
-            clearInterval(interval);
-            onComplete();
-        }
-    }, typingSpeed);
-  }, []);
-
   const handleDeleteMessage = useCallback((messageId: string) => {
     const messageIndex = messages.findIndex(m => m.id === messageId);
     if (messageIndex === -1) return;
@@ -310,13 +284,22 @@ function App() {
              }
              return p as Part;
         });
-        const response = await chatSessionRef.current.sendMessage({ message: apiParts });
-        const responseText = response.text;
+        
+        const stream = await chatSessionRef.current.sendMessageStream({ message: apiParts });
 
-        streamTextToSession(activeSessionId, aiMessageId, responseText, () => {
-            setIsLoading(false);
-            inputRef.current?.focus();
-        });
+        let fullResponse = '';
+        for await (const chunk of stream) {
+            fullResponse += chunk.text;
+            setSessions(prev => prev.map(s => {
+                if (s.id === activeSessionId) {
+                    const updatedMessages = s.messages.map(m => 
+                        m.id === aiMessageId ? { ...m, parts: [{ text: fullResponse }] } : m
+                    );
+                    return { ...s, messages: updatedMessages };
+                }
+                return s;
+            }));
+        }
     } catch (error) {
         console.error("Gemini Error:", error);
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
@@ -326,9 +309,11 @@ function App() {
             }
             return s;
         }));
-        setIsLoading(false);
+    } finally {
+      setIsLoading(false);
+      inputRef.current?.focus();
     }
-  }, [isLoading, attachments, messages, activeSessionId, streamTextToSession]);
+  }, [isLoading, attachments, messages, activeSessionId]);
   
   const handleSaveEdit = useCallback(async (id: string, newText: string) => {
     const targetIndex = messages.findIndex(msg => msg.id === id);
@@ -403,20 +388,30 @@ function App() {
     
     try {
         const thoughtChat = createChatSession(messages);
-        const response = await thoughtChat.sendMessage({ message: prompt });
-        const fullResponse = response.text;
+        const stream = await thoughtChat.sendMessageStream({ message: prompt });
         
-        streamTextToSession(activeSessionId, aiMessageId, fullResponse, () => {
-            setIsLoading(false);
-            inputRef.current?.focus();
-        });
+        let fullResponse = '';
+        for await (const chunk of stream) {
+            fullResponse += chunk.text;
+            setSessions(prev => prev.map(s => {
+                if (s.id === activeSessionId) {
+                    const updatedMessages = s.messages.map(m => 
+                        m.id === aiMessageId ? { ...m, parts: [{ text: fullResponse }] } : m
+                    );
+                    return { ...s, messages: updatedMessages };
+                }
+                return s;
+            }));
+        }
     } catch (e) {
         console.error("Autonomous thought error:", e);
         const errorMessage = e instanceof Error ? e.message : "An unknown error occurred.";
         setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, messages: s.messages.map(m => m.id === aiMessageId ? { ...m, parts: [{ text: `Autonomous thought cycle failed: ${errorMessage}` }] } : m) } : s));
+    } finally {
         setIsLoading(false);
+        inputRef.current?.focus();
     }
-  }, [isLoading, graphData, messages, activeSessionId, streamTextToSession]);
+  }, [isLoading, graphData, messages, activeSessionId]);
 
 
   if (!isInitialized) {
