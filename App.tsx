@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Chat, Part } from '@google/genai';
 import { v4 as uuidv4 } from 'uuid';
@@ -53,7 +52,7 @@ function App() {
   const [justEditedId, setJustEditedId] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [deleteCandidate, setDeleteCandidate] = useState<{ type: 'message' | 'session' | 'memory-wipe', id: string } | null>(null);
-  const [attachment, setAttachment] = useState<FileContext | UrlContext | null>(null);
+  const [attachments, setAttachments] = useState<(FileContext | UrlContext)[]>([]);
   const [isUrlModalOpen, setIsUrlModalOpen] = useState(false);
   const [isChangelogModalOpen, setIsChangelogModalOpen] = useState(false);
   const [isSessionManagerOpen, setIsSessionManagerOpen] = useState(false);
@@ -150,6 +149,32 @@ function App() {
     }
   }, [isSuggestionsEnabled, messages, isLoading]);
 
+  const streamTextToSession = useCallback((sessionId: string, messageId: string, fullText: string, onComplete: () => void) => {
+    let currentIndex = 0;
+    const typingSpeed = 20;
+
+    const interval = setInterval(() => {
+        const partialText = fullText.substring(0, currentIndex + 1);
+        
+        setSessions(prev => prev.map(s => {
+            if (s.id === sessionId) {
+                const newMessages = [...s.messages];
+                const msgIndex = newMessages.findIndex(m => m.id === messageId);
+                if (msgIndex !== -1) {
+                    newMessages[msgIndex] = { ...newMessages[msgIndex], parts: [{ text: partialText }] };
+                    return { ...s, messages: newMessages };
+                }
+            }
+            return s;
+        }));
+
+        currentIndex++;
+        if (currentIndex > fullText.length) {
+            clearInterval(interval);
+            onComplete();
+        }
+    }, typingSpeed);
+  }, []);
 
   const handleDeleteMessage = useCallback((messageId: string) => {
     const messageIndex = messages.findIndex(m => m.id === messageId);
@@ -255,17 +280,19 @@ function App() {
   const handleSendMessage = useCallback(async (messageText: string) => {
     if (isLoading) return;
     const text = messageText.trim();
-    if (!text && !attachment) return;
+    if (!text && attachments.length === 0) return;
 
     setIsLoading(true);
     setInput('');
     setSuggestions([]);
     
     let userParts: DisplayPart[] = [];
-    if (attachment) {
-        if ('file' in attachment) userParts.push({ inlineData: { mimeType: attachment.mimeType, data: attachment.base64, fileName: attachment.file.name }});
-        if ('url' in attachment) userParts.push({ text: `CONTEXT FROM ${attachment.url}:\n\n${attachment.content}` });
-        setAttachment(null);
+    if (attachments.length > 0) {
+        attachments.forEach(attachment => {
+            if ('file' in attachment) userParts.push({ inlineData: { mimeType: attachment.mimeType, data: attachment.base64, fileName: attachment.file.name }});
+            if ('url' in attachment) userParts.push({ text: `CONTEXT FROM ${attachment.url}:\n\n${attachment.content}` });
+        });
+        setAttachments([]);
     }
     if (text) userParts.push({ text });
 
@@ -286,15 +313,10 @@ function App() {
         const response = await chatSessionRef.current.sendMessage({ message: apiParts });
         const responseText = response.text;
 
-        setSessions(prevSessions => prevSessions.map(s => {
-            if (s.id === activeSessionId) {
-                return {
-                    ...s,
-                    messages: s.messages.map(m => m.id === aiMessageId ? { ...m, parts: [{ text: responseText }] } : m)
-                };
-            }
-            return s;
-        }));
+        streamTextToSession(activeSessionId, aiMessageId, responseText, () => {
+            setIsLoading(false);
+            inputRef.current?.focus();
+        });
     } catch (error) {
         console.error("Gemini Error:", error);
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
@@ -304,11 +326,9 @@ function App() {
             }
             return s;
         }));
-    } finally {
         setIsLoading(false);
-        inputRef.current?.focus();
     }
-  }, [isLoading, attachment, messages, activeSessionId]);
+  }, [isLoading, attachments, messages, activeSessionId, streamTextToSession]);
   
   const handleSaveEdit = useCallback(async (id: string, newText: string) => {
     const targetIndex = messages.findIndex(msg => msg.id === id);
@@ -328,25 +348,42 @@ function App() {
     await handleSendMessage(newText);
   }, [messages, handleSendMessage, activeSessionId]);
   
-  // ... other handlers (file, url, autonomous thought) unchanged but adapted for `updateSession`
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAttachment({ file, base64: (reader.result as string).split(',')[1], mimeType: file.type });
-        inputRef.current?.focus();
-      };
-      reader.readAsDataURL(file);
+    const files = event.target.files;
+    if (files && files.length > 0) {
+        if (attachments.length > 0 && 'url' in attachments[0]) {
+            setAttachments([]); // Clear URL attachment if files are added
+        }
+
+        const filePromises = Array.from(files).map(file => {
+            return new Promise<FileContext>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    resolve({ file, base64: (reader.result as string).split(',')[1], mimeType: file.type });
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        });
+
+        Promise.all(filePromises).then(newFileAttachments => {
+            setAttachments(prev => [...prev.filter(a => 'file' in a), ...newFileAttachments]);
+            inputRef.current?.focus();
+        });
     }
   };
 
   const handleAttachUrl = (context: UrlContext) => {
-    setAttachment(context);
+    setAttachments([context]); // Replaces any existing attachments
     setIsUrlModalOpen(false);
     inputRef.current?.focus();
     setInput(prev => `Based on the attached context, ${prev}`);
   }
+  
+  const handleRemoveAttachment = (indexToRemove: number) => {
+      setAttachments(prev => prev.filter((_, index) => index !== indexToRemove));
+  };
+
 
   const handleAutonomousThought = useCallback(async () => {
     if (isLoading || graphData.nodes.length < 3) return;
@@ -369,16 +406,17 @@ function App() {
         const response = await thoughtChat.sendMessage({ message: prompt });
         const fullResponse = response.text;
         
-        setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, messages: s.messages.map(m => m.id === aiMessageId ? { ...m, parts: [{text: fullResponse}]} : m) } : s));
+        streamTextToSession(activeSessionId, aiMessageId, fullResponse, () => {
+            setIsLoading(false);
+            inputRef.current?.focus();
+        });
     } catch (e) {
         console.error("Autonomous thought error:", e);
         const errorMessage = e instanceof Error ? e.message : "An unknown error occurred.";
         setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, messages: s.messages.map(m => m.id === aiMessageId ? { ...m, parts: [{ text: `Autonomous thought cycle failed: ${errorMessage}` }] } : m) } : s));
-    } finally {
         setIsLoading(false);
-        inputRef.current?.focus();
     }
-  }, [isLoading, graphData, messages, activeSessionId]);
+  }, [isLoading, graphData, messages, activeSessionId, streamTextToSession]);
 
 
   if (!isInitialized) {
@@ -483,8 +521,8 @@ function App() {
                         maxLength={MAX_INPUT_LENGTH}
                         onOpenUrlModal={() => setIsUrlModalOpen(true)}
                         onFileChange={handleFileChange}
-                        attachment={attachment}
-                        onRemoveAttachment={() => setAttachment(null)}
+                        attachments={attachments}
+                        onRemoveAttachment={handleRemoveAttachment}
                         isAutoScrollEnabled={isAutoScrollEnabled}
                         onToggleAutoScroll={() => setIsAutoScrollEnabled(p => !p)}
                         isSuggestionsEnabled={isSuggestionsEnabled}

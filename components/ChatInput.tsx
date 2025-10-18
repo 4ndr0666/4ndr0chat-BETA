@@ -12,8 +12,8 @@ interface ChatInputProps {
   maxLength: number;
   onOpenUrlModal: () => void;
   onFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  attachment: FileContext | UrlContext | null;
-  onRemoveAttachment: () => void;
+  attachments: (FileContext | UrlContext)[];
+  onRemoveAttachment: (index: number) => void;
   isAutoScrollEnabled: boolean;
   onToggleAutoScroll: () => void;
   isSuggestionsEnabled: boolean;
@@ -22,15 +22,16 @@ interface ChatInputProps {
   onDistillMemory: () => void;
 }
 
+const isFile = (attachment: FileContext | UrlContext): attachment is FileContext => 'file' in attachment;
+
 const AttachmentPill: React.FC<{
     attachment: FileContext | UrlContext;
     onRemove: () => void;
 }> = ({ attachment, onRemove }) => {
-    const isFile = 'file' in attachment;
-    const name = isFile ? attachment.file.name : attachment.url;
+    const name = isFile(attachment) ? attachment.file.name : attachment.url;
     return (
         <div className="attached-url-pill">
-            {isFile ? <PaperclipIcon className="h-4 w-4" /> : <LinkIcon className="h-4 w-4" />}
+            {isFile(attachment) ? <PaperclipIcon className="h-4 w-4" /> : <LinkIcon className="h-4 w-4" />}
             <span className="url-text">{name}</span>
             <button onClick={onRemove} className="remove-url-button" aria-label="Remove attachment">
                 &times;
@@ -43,14 +44,15 @@ const AttachmentPill: React.FC<{
 const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
   ({ 
     input, setInput, onSendMessage, isLoading, maxLength, onOpenUrlModal, onFileChange,
-    attachment, onRemoveAttachment, isAutoScrollEnabled, onToggleAutoScroll, isSuggestionsEnabled, onToggleSuggestions,
+    attachments, onRemoveAttachment, isAutoScrollEnabled, onToggleAutoScroll, isSuggestionsEnabled, onToggleSuggestions,
     onAutonomousThought, onDistillMemory
   }, ref) => {
     const [isFocused, setIsFocused] = useState(false);
     const [isToolsOpen, setIsToolsOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const toolsRef = useRef<HTMLDivElement>(null);
-    const hasAttachment = !!attachment;
+    const hasAttachments = attachments.length > 0;
+    const hasUrlAttachment = hasAttachments && 'url' in attachments[0];
     const isOverLimit = input.length > maxLength;
 
     useEffect(() => {
@@ -65,7 +67,7 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      if ((input.trim() || hasAttachment) && !isLoading && !isOverLimit) {
+      if ((input.trim() || hasAttachments) && !isLoading && !isOverLimit) {
         onSendMessage(input);
       }
     };
@@ -90,7 +92,13 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
     return (
       <form onSubmit={handleSubmit} className="max-w-4xl mx-auto relative">
-        {attachment && <AttachmentPill attachment={attachment} onRemove={onRemoveAttachment} />}
+        {hasAttachments && (
+            <div className="flex flex-wrap gap-2 mb-3">
+                {attachments.map((att, index) => (
+                    <AttachmentPill key={isFile(att) ? `${att.file.name}-${att.file.lastModified}` : att.url} attachment={att} onRemove={() => onRemoveAttachment(index)} />
+                ))}
+            </div>
+        )}
         <div className={`chat-input-container ${isFocused ? 'is-focused' : ''} ${isOverLimit ? '!border-red-500' : ''}`}>
             <div className="flex items-center gap-2">
                 <div className="relative" ref={toolsRef}>
@@ -114,11 +122,11 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                         </div>
                     )}
                 </div>
-                <input type="file" ref={fileInputRef} onChange={onFileChange} className="hidden" accept="image/*" />
-                <button type="button" onClick={onOpenUrlModal} className="action-button" aria-label="Attach URL" disabled={hasAttachment}>
+                <input type="file" ref={fileInputRef} onChange={onFileChange} className="hidden" accept="image/*" multiple />
+                <button type="button" onClick={onOpenUrlModal} className="action-button" aria-label="Attach URL" disabled={hasAttachments}>
                   <LinkIcon />
                 </button>
-                <button type="button" onClick={handleAttachFileClick} className="action-button" aria-label="Attach file" disabled={hasAttachment}>
+                <button type="button" onClick={handleAttachFileClick} className="action-button" aria-label="Attach file" disabled={hasUrlAttachment}>
                   <PaperclipIcon />
                 </button>
                 <button type="button" onClick={onAutonomousThought} className="action-button" title="Initiate Autonomous Thought Cycle" aria-label="Initiate thought cycle" disabled={isLoading}>
@@ -146,7 +154,7 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               {input && (<button type="button" onClick={handleClearInput} className="clear-input-button" aria-label="Clear input"><ClearIcon /></button>)}
             </div>
             <div className={`char-count-container ${isOverLimit ? 'text-error' : ''}`}>{input.length} / {maxLength}</div>
-            <button type="submit" disabled={isLoading || (!input.trim() && !hasAttachment) || isOverLimit} className="action-button" aria-label="Send message">
+            <button type="submit" disabled={isLoading || (!input.trim() && !hasAttachments) || isOverLimit} className="action-button" aria-label="Send message">
               <SendIcon />
             </button>
         </div>
