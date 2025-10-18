@@ -101,16 +101,20 @@ export const EditIcon: React.FC<IconProps> = ({ className }) => (
 
 export const SplashScreenGlyphIcon: React.FC<IconProps> = ({ className }) => (
     <svg className={className} viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-        <path className="glyph-hex" d="M100 20 L180 60 L180 140 L100 180 L20 140 L20 60 Z" />
+        <path className="glyph-hex" d="M100 20 L180 60 L180 140 L100 180 L20 140 L20 60 Z" strokeWidth="2"/>
         <g className="glyph-ring-2">
-            <circle cx="100" cy="100" r="65" strokeWidth="3" />
+            <circle cx="100" cy="100" r="78" strokeWidth="3" />
         </g>
         <g className="glyph-ring-1">
-            <circle cx="100" cy="100" r="50" strokeWidth="2" />
+            <circle cx="100" cy="100" r="68" strokeWidth="2" />
         </g>
-        <g className="glyph-core-psi" strokeWidth="10">
-            <path d="M100 140 V 100" />
-            <path d="M70 65 C 70 105, 130 105, 130 65" />
+        <g className="glyph-core-psi" strokeWidth="7">
+            {/* The Y-shaped part */}
+            <path d="M 100 115 V 90" />
+            <path d="M 100 90 L 80 70" />
+            <path d="M 100 90 L 120 70" />
+            {/* The arc on top */}
+            <path d="M 80 70 A 20 20 0 0 1 120 70" fill="none" />
         </g>
     </svg>
 );
@@ -135,7 +139,7 @@ export const MergeIcon: React.FC<IconProps> = ({ className }) => (
 );
 
 export const SessionsIcon: React.FC<IconProps> = ({ className }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2-2H6a2 2 0 01-2-2V6z" />
         <path strokeLinecap="round" strokeLinejoin="round" d="M4 9h16" />
         <path strokeLinecap="round" strokeLinejoin="round" d="M8 6v14" />
