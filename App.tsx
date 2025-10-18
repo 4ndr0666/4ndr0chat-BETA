@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Chat, Part } from '@google/genai';
 import { v4 as uuidv4 } from 'uuid';
@@ -118,7 +120,7 @@ function App() {
   
   useEffect(() => {
     const updateGraph = async () => {
-        const newGraph = await processMessagesForGraph(messages);
+        const newGraph = await processMessagesForGraph(messages, graphData);
         updateSession(activeSessionId, {
             graphData: {
                 nodes: newGraph.nodes.map(newNode => {
@@ -129,10 +131,10 @@ function App() {
             }
         });
     };
-    if (messages.length > 1) {
+    if (isInitialized) {
       updateGraph();
     }
-  }, [messages]);
+  }, [messages, isInitialized]);
 
   useEffect(() => {
     if (isSuggestionsEnabled && messages.length > 1 && !isLoading) {
@@ -281,24 +283,18 @@ function App() {
              }
              return p as Part;
         });
-        const stream = await chatSessionRef.current.sendMessageStream({ message: apiParts });
+        const response = await chatSessionRef.current.sendMessage({ message: apiParts });
+        const responseText = response.text;
 
-        let accumulatedText = '';
-        for await (const chunk of stream) {
-            const chunkText = chunk.text;
-            if (chunkText) {
-                accumulatedText += chunkText;
-                setSessions(prevSessions => prevSessions.map(s => {
-                    if (s.id === activeSessionId) {
-                        return {
-                            ...s,
-                            messages: s.messages.map(m => m.id === aiMessageId ? { ...m, parts: [{ text: accumulatedText }] } : m)
-                        };
-                    }
-                    return s;
-                }));
+        setSessions(prevSessions => prevSessions.map(s => {
+            if (s.id === activeSessionId) {
+                return {
+                    ...s,
+                    messages: s.messages.map(m => m.id === aiMessageId ? { ...m, parts: [{ text: responseText }] } : m)
+                };
             }
-        }
+            return s;
+        }));
     } catch (error) {
         console.error("Gemini Error:", error);
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
@@ -370,15 +366,10 @@ function App() {
     
     try {
         const thoughtChat = createChatSession(messages);
-        const stream = await thoughtChat.sendMessageStream({ message: prompt });
-        let fullResponse = '';
-        for await (const chunk of stream) {
-            const chunkText = chunk.text;
-            if (chunkText) {
-                fullResponse += chunkText;
-                setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, messages: s.messages.map(m => m.id === aiMessageId ? { ...m, parts: [{text: fullResponse}]} : m) } : s));
-            }
-        }
+        const response = await thoughtChat.sendMessage({ message: prompt });
+        const fullResponse = response.text;
+        
+        setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, messages: s.messages.map(m => m.id === aiMessageId ? { ...m, parts: [{text: fullResponse}]} : m) } : s));
     } catch (e) {
         console.error("Autonomous thought error:", e);
         const errorMessage = e instanceof Error ? e.message : "An unknown error occurred.";

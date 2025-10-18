@@ -1,4 +1,3 @@
-
 import { ChatMessage, DisplayPart, Author } from '../types';
 import { extractGraphDataFromText } from './geminiService';
 
@@ -38,14 +37,32 @@ const extractText = (parts: DisplayPart[]): string => {
     return parts.filter(p => 'text' in p).map(p => (p as {text: string}).text).join(' ');
 }
 
-export const processMessagesForGraph = async (messages: ChatMessage[]): Promise<CognitiveGraphData> => {
-    const nodes: Omit<GraphNode, 'x' | 'y' | 'vx' | 'vy'>[] = [];
-    const links: GraphLink[] = [];
-    const conceptMap = new Map<string, Omit<GraphNode, 'x' | 'y' | 'vx' | 'vy'>>();
-    
-    for (const message of messages) {
-        if (message.id === 'ai-initial-greeting') continue;
+export const processMessagesForGraph = async (messages: ChatMessage[], currentGraph: CognitiveGraphData): Promise<CognitiveGraphData> => {
+    const processedMessageIds = new Set(
+        currentGraph.nodes
+            .filter(node => ['user', 'ai', 'system'].includes(node.type))
+            .map(node => node.id)
+    );
 
+    const newMessagesToProcess = messages.filter(
+        msg => !processedMessageIds.has(msg.id) && msg.id !== 'ai-initial-greeting'
+    );
+
+    if (newMessagesToProcess.length === 0) {
+        return currentGraph;
+    }
+
+    console.log(`[COGNITIVE_CORE] Processing ${newMessagesToProcess.length} new message(s) for graph.`);
+
+    const nodes: GraphNode[] = [...currentGraph.nodes];
+    const links: GraphLink[] = [...currentGraph.links];
+    const conceptMap = new Map<string, GraphNode>(
+        currentGraph.nodes
+            .filter(n => n.type === 'concept')
+            .map(n => [n.id, n])
+    );
+
+    for (const message of newMessagesToProcess) {
         const messageNode = {
             id: message.id,
             label: message.author,
@@ -54,10 +71,13 @@ export const processMessagesForGraph = async (messages: ChatMessage[]): Promise<
             weight: 0.5,
             sentiment: 0,
         };
-        nodes.push(messageNode);
+        nodes.push(messageNode as GraphNode);
         
         const text = extractText(message.parts);
         if (!text) continue;
+
+        // Add a delay before each API call to avoid rate-limiting.
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
         const graphData = await extractGraphDataFromText(text);
 
@@ -72,8 +92,8 @@ export const processMessagesForGraph = async (messages: ChatMessage[]): Promise<
                     weight: concept.weight,
                     sentiment: concept.sentiment,
                 };
-                nodes.push(conceptNode);
-                conceptMap.set(conceptId, conceptNode);
+                nodes.push(conceptNode as GraphNode);
+                conceptMap.set(conceptId, conceptNode as GraphNode);
             }
             links.push({ source: message.id, target: conceptId, weight: concept.weight });
         });
@@ -90,10 +110,6 @@ export const processMessagesForGraph = async (messages: ChatMessage[]): Promise<
             }
         });
     }
-    
-    // Deduplicate nodes and links
-    const uniqueNodes = Array.from(new Map(nodes.map(n => [n.id, n])).values());
-    const uniqueLinks = Array.from(new Map(links.map(l => [`${l.source}-${l.target}`, l])).values());
 
-    return { nodes: uniqueNodes as GraphNode[], links: uniqueLinks };
+    return { nodes, links };
 };
