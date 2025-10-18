@@ -1,5 +1,7 @@
 
-import { GraphNode as D3GraphNode } from 'd3-force';
+
+// Fix: The 'd3-force' module does not export 'GraphNode'. The correct type for simulation nodes is 'SimulationNodeDatum'.
+import { SimulationNodeDatum as D3GraphNode } from 'd3-force';
 
 export interface GraphNode extends D3GraphNode {
     id: string;

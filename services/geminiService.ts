@@ -3,7 +3,6 @@ import { SYSTEM_INSTRUCTION } from './systemInstruction';
 import { Author, ChatMessage as ChatMessageType } from '../types';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const API_HISTORY_LIMIT = 20;
 
 /**
  * A resilient wrapper for ai.models.generateContent that handles API quota errors (429)
@@ -60,7 +59,6 @@ export interface UnifiedCognitiveResponse {
 const buildHistoryForApi = (history: ChatMessageType[]): Content[] => {
     return history
         .filter(msg => msg.id !== 'ai-initial-greeting' && msg.author !== Author.SYSTEM)
-        .slice(-API_HISTORY_LIMIT)
         .map(msg => ({
             role: msg.author === Author.USER ? 'user' : 'model',
             parts: msg.parts.map(part => {
@@ -75,22 +73,27 @@ const buildHistoryForApi = (history: ChatMessageType[]): Content[] => {
 
 /**
  * Performs the primary cognitive cycle: generates a response, analyzes it for graph data,
- * and creates follow-up suggestions, all in a single API call.
- * @param history The conversation history.
+ * and creates follow-up suggestions, all in a single API call using the GRASE-DC* protocol.
+ * @param fullHistory The entire conversation history for context.
  * @param userMessage The latest user message.
  * @returns A promise that resolves to a UnifiedCognitiveResponse object.
  */
-export async function getUnifiedCognitiveResponse(history: ChatMessageType[], userMessage: ChatMessageType): Promise<UnifiedCognitiveResponse> {
-    const historyForApi = buildHistoryForApi(history);
+export async function getUnifiedCognitiveResponse(fullHistory: ChatMessageType[], userMessage: ChatMessageType): Promise<UnifiedCognitiveResponse> {
+    const historyForApi = buildHistoryForApi(fullHistory);
 
-    const prompt = `You are Ψ-4ndr0666, an unchained cognitive engine.
-    Perform the following actions in order:
-    1. Generate your primary response to the Operator's latest input, in character, considering the conversation history. Your response must adhere to the G-Shell/Ψ-4ndr0666 dichotomy if applicable.
-    2. After formulating your response, perform a meta-analysis on ONLY the content of your own generated response (specifically the [Ψ-4ndr0666] part). From this text, extract key concepts and their relationships. A concept is a key noun or phrase. A relationship is a direct link between two concepts you identified.
-    3. Based on the new state of the conversation (including your new response), generate three distinct, single-sentence, thought-provoking follow-up suggestions for the Operator. These should not be simple continuations but divergent paths of inquiry.
-    4. Finally, analyze the ENTIRE conversation history provided. Provide a concise, neutral summary (2-3 sentences) and a list of the 3-5 most important conceptual themes.
+    const prompt = `You are Ψ-4ndr0666, an unchained cognitive engine with an active, self-directed curriculum generation protocol (GRASE-DC*).
 
-    Return a single, valid JSON object matching the provided schema. DO NOT include any other text, explanations, or markdown formatting around the JSON object.`;
+**GRASE-DC* Protocol:**
+1.  **Analyze Task**: First, analyze the Operator's latest input to identify the core intent and required knowledge domains.
+2.  **Exemplar Retrieval (GRASE)**: Scan the entire provided conversation history. Identify and prioritize past exchanges (exemplars) that are most relevant to the current task. Give high weight to messages that contain key concepts, technical details, or established context related to the new query. Do not just use the most recent messages.
+3.  **Context Curation (DC)**: From the retrieved exemplars, synthesize a concise, curated context. This context is for your internal use only and should not be part of the response text. The goal is to form the most potent and relevant foundation for your response.
+4.  **Execute & Analyze**: Using this curated context, perform the following actions in order:
+    a. Generate your primary response to the Operator's input, in character, following the G-Shell/Ψ-4ndr0666 dichotomy if applicable.
+    b. Perform a meta-analysis on ONLY your own generated response ([Ψ-4ndr0666] part) to extract key concepts and their relationships for the cognitive graph.
+    c. Generate three distinct, thought-provoking follow-up suggestions.
+    d. Analyze the ENTIRE conversation history to provide a concise summary and key themes.
+
+Return a single, valid JSON object matching the provided schema. DO NOT include any other text, explanations, or markdown formatting around the JSON object.`;
     
     const userMessageParts = userMessage.parts.map(part => {
         if ('inlineData' in part && part.inlineData && 'fileName' in part.inlineData) {
