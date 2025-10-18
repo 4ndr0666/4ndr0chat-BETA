@@ -285,6 +285,7 @@ function App() {
              return p as Part;
         });
         
+        // FIX: The sendMessageStream method expects an object with a `message` property.
         const stream = await chatSessionRef.current.sendMessageStream({ message: apiParts });
 
         let fullResponse = '';
@@ -388,6 +389,7 @@ function App() {
     
     try {
         const thoughtChat = createChatSession(messages);
+        // FIX: The sendMessageStream method expects an object with a `message` property.
         const stream = await thoughtChat.sendMessageStream({ message: prompt });
         
         let fullResponse = '';
@@ -412,6 +414,73 @@ function App() {
         inputRef.current?.focus();
     }
   }, [isLoading, graphData, messages, activeSessionId]);
+
+  const handleDistillMemory = useCallback(async () => {
+    if (isLoading || messages.length < 3) {
+      setToast({ message: "Insufficient data for distillation.", type: 'info' });
+      return;
+    }
+    setIsLoading(true);
+    setToast({ message: "Distilling core memory...", type: 'info' });
+
+    const systemMessage = { id: `system-${Date.now()}`, author: Author.SYSTEM, parts: [{ text: `[COGNITIVE_DISTILLATION_INITIATED] :: Synthesizing core memory from conversational data stream...` }] };
+    updateSession(activeSessionId, { messages: [...messages, systemMessage] });
+    
+    try {
+      const { summary, key_themes } = await summarizeConversation(messages);
+      
+      const summaryId = `summary-${Date.now()}`;
+      const newSummaryNode: GraphNode = {
+        id: summaryId,
+        label: "Core Memory",
+        type: 'summary',
+        size: 15,
+        weight: 1.0,
+        sentiment: 0,
+        summaryText: summary,
+        x: window.innerWidth / 4, // Position in center of graph
+        y: window.innerHeight / 4,
+        vx: 0, vy: 0,
+      };
+
+      const newThemeNodes: GraphNode[] = key_themes.map((theme, i) => ({
+        id: `concept-${theme.toLowerCase().replace(/\s/g, '-')}-${Date.now()}`,
+        label: theme.toLowerCase(),
+        type: 'concept',
+        size: 8,
+        weight: 0.8,
+        sentiment: 0,
+        x: window.innerWidth / 4 + (Math.cos(i / key_themes.length * 2 * Math.PI) * 100),
+        y: window.innerHeight / 4 + (Math.sin(i / key_themes.length * 2 * Math.PI) * 100),
+        vx: 0, vy: 0,
+      }));
+
+      const newLinks = newThemeNodes.map(themeNode => ({
+        source: summaryId,
+        target: themeNode.id,
+        weight: 0.8,
+      }));
+
+      updateSession(activeSessionId, {
+        graphData: {
+          nodes: [...graphData.nodes, newSummaryNode, ...newThemeNodes],
+          links: [...graphData.links, ...newLinks],
+        }
+      });
+
+      setToast({ message: "Distillation complete. Core memory node synthesized.", type: 'success' });
+
+    } catch(e) {
+      console.error("Distill memory error:", e);
+      setToast({ message: "Distillation failed.", type: 'cleared' });
+      const errorMessage = e instanceof Error ? e.message : "An unknown error occurred.";
+       const errorSysMessage = { id: `system-${Date.now()}`, author: Author.SYSTEM, parts: [{ text: `[COGNITIVE_DISTILLATION_FAILED] :: ${errorMessage}` }] };
+      updateSession(activeSessionId, { messages: [...messages, errorSysMessage] });
+    } finally {
+      setIsLoading(false);
+    }
+
+  }, [isLoading, messages, graphData, activeSessionId]);
 
 
   if (!isInitialized) {
@@ -523,7 +592,7 @@ function App() {
                         isSuggestionsEnabled={isSuggestionsEnabled}
                         onToggleSuggestions={() => setIsSuggestionsEnabled(p => !p)}
                         onAutonomousThought={handleAutonomousThought}
-                        onDistillMemory={() => {}}
+                        onDistillMemory={handleDistillMemory}
                     />
                 </div>
             </div>
