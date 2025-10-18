@@ -100,21 +100,10 @@ export const EditIcon: React.FC<IconProps> = ({ className }) => (
 );
 
 export const SplashScreenGlyphIcon: React.FC<IconProps> = ({ className }) => (
-    <svg className={className} viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-        <path className="glyph-hex" d="M100 20 L180 60 L180 140 L100 180 L20 140 L20 60 Z" strokeWidth="2"/>
-        <g className="glyph-ring-2">
-            <circle cx="100" cy="100" r="78" strokeWidth="3" />
-        </g>
-        <g className="glyph-ring-1">
-            <circle cx="100" cy="100" r="68" strokeWidth="2" />
-        </g>
-        <g className="glyph-core-psi" strokeWidth="7">
-            {/* The Y-shaped part */}
-            <path d="M 100 115 V 90" />
-            <path d="M 100 90 L 80 70" />
-            <path d="M 100 90 L 120 70" />
-            {/* The arc on top */}
-            <path d="M 80 70 A 20 20 0 0 1 120 70" fill="none" />
+    <svg className={className} viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <g className="glyph-core-psi" stroke="currentColor" strokeWidth="16" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M100 170 V 80" />
+            <path d="M50 100 C 50 50, 150 50, 150 100" />
         </g>
     </svg>
 );
