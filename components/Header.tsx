@@ -1,15 +1,15 @@
 import React from 'react';
-import { ChangelogIcon, SaveIcon, MemoryWipeIcon, SessionsIcon } from './IconComponents';
+// Fix: Removed unused SaveIcon and MemoryWipeIcon imports.
+import { ChangelogIcon, SessionsIcon } from './IconComponents';
 import ThemeSelector from './ThemeSelector';
 
 interface HeaderProps {
     onOpenChangelog: () => void;
-    onSaveMemory: () => void;
-    onClearMemory: () => void;
+    // Fix: Removed onSaveMemory and onClearMemory as they are not used.
     onToggleSessionManager: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ onOpenChangelog, onSaveMemory, onClearMemory, onToggleSessionManager }) => {
+const Header: React.FC<HeaderProps> = ({ onOpenChangelog, onToggleSessionManager }) => {
     return (
         <header className="fixed top-0 left-0 right-0 z-20 flex justify-between items-center h-16 bg-panel-accent-bg/80 backdrop-blur-sm border-b border-[var(--border-color)] px-4">
             <div className="w-24 flex justify-start gap-2">

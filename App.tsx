@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { GoogleGenAI, Chat, Part } from '@google/genai';
 import { v4 as uuidv4 } from 'uuid';
@@ -17,7 +16,6 @@ import CognitiveGraphVisualizer from './components/CognitiveGraphVisualizer';
 import SessionManager from './components/SessionManager';
 
 import { createChatSession, getPromptSuggestions, summarizeConversation } from './services/geminiService';
-// FIX: Import GraphNode and GraphLink types
 import { processMessagesForGraph, CognitiveGraphData, GraphNode, GraphLink } from './services/cognitiveCore';
 
 import { Author, ChatMessage as ChatMessageType, FileContext, UrlContext, DisplayPart, Session } from './types';
@@ -173,9 +171,30 @@ function App() {
     }
   }, [isSuggestionsEnabled, messages, isLoading]);
 
+  const handleDeleteMessage = useCallback((messageId: string) => {
+    setMessages(prev => {
+        const messageIndex = prev.findIndex(m => m.id === messageId);
+        if (messageIndex === -1) return prev;
+
+        // If the deleted message is from the user and an AI response follows, delete both
+        if (prev[messageIndex].author === Author.USER && 
+            messageIndex + 1 < prev.length && 
+            prev[messageIndex + 1].author === Author.AI) {
+            return prev.slice(0, messageIndex).concat(prev.slice(messageIndex + 2));
+        }
+
+        // Otherwise, just delete the single message
+        return prev.filter(m => m.id !== messageId);
+    });
+  }, []);
+
   const handleDelete = () => {
-    if(deleteCandidateId?.startsWith('session-')){
+    if (!deleteCandidateId) return;
+
+    if (deleteCandidateId.startsWith('session-')) {
         handleDeleteSession(deleteCandidateId.replace('session-', ''));
+    } else {
+        handleDeleteMessage(deleteCandidateId);
     }
     setDeleteCandidateId(null);
   };
@@ -302,7 +321,7 @@ function App() {
     });
     setSelectedNodes(new Set());
     setToast({ message: `${selectedNodes.size} nodes pruned.`, type: 'cleared' });
-  }, [selectedNodes]);
+  }, [selectedNodes, setGraphData]);
 
   const handleMergeSelectedNodes = useCallback(() => {
     if (selectedNodes.size < 2) return;
@@ -342,7 +361,7 @@ function App() {
     });
     setSelectedNodes(new Set());
     setToast({ message: `${selectedNodes.size} nodes consolidated.`, type: 'info' });
-  }, [selectedNodes]);
+  }, [selectedNodes, setGraphData]);
 
   // Cognitive Distillation Handler
   const handleDistillMemory = useCallback(async () => {
@@ -369,7 +388,7 @@ function App() {
     } finally {
         setIsLoading(false);
     }
-  }, [messages, isLoading]);
+  }, [messages, isLoading, setGraphData]);
 
   const handleSendMessage = useCallback(async (messageText: string) => {
     if (isLoading || !activeSessionId) return;
@@ -403,7 +422,6 @@ function App() {
              }
              return p as Part;
         });
-        // FIX: Corrected sendMessageStream payload to be an object with a `message` property.
         const stream = await chatSessionRef.current.sendMessageStream({ message: apiParts });
 
         let accumulatedText = '';
@@ -475,7 +493,6 @@ function App() {
     setMessages(prev => [...prev, { id: aiMessageId, author: Author.AI, parts: [{ text: '' }] }]);
     try {
         const thoughtChat = createChatSession(messages);
-        // FIX: Corrected sendMessageStream payload to be an object with a `message` property.
         const stream = await thoughtChat.sendMessageStream({ message: prompt });
         let fullResponse = '';
         for await (const chunk of stream) {
@@ -503,8 +520,6 @@ function App() {
     <div className="main-frame">
         <Header 
             onOpenChangelog={() => setIsChangelogModalOpen(true)}
-            onSaveMemory={() => {}} // Deprecated, now auto-saves
-            onClearMemory={() => {}} // Deprecated, now in session manager
             onToggleSessionManager={() => setIsSessionManagerOpen(p => !p)}
         />
         {isSessionManagerOpen && (
@@ -554,10 +569,11 @@ function App() {
                             onCancelEdit={() => setEditingMessageId(null)}
                             onSaveEdit={handleSaveEdit}
                             isLastMessage={index === messages.length - 1}
+                            onDelete={() => setDeleteCandidateId(message.id)}
                           />
                         ))}
                         {isLoading && messages[messages.length -1]?.author !== Author.AI && (
-                             <ChatMessage message={{id: 'loading', author: Author.AI, parts: [{text: ''}]}} isEditing={false} justEditedId={null} onStartEdit={() => {}} onCancelEdit={() => {}} onSaveEdit={() => {}} isLastMessage={true} />
+                             <ChatMessage message={{id: 'loading', author: Author.AI, parts: [{text: ''}]}} isEditing={false} justEditedId={null} onStartEdit={() => {}} onCancelEdit={() => {}} onSaveEdit={() => {}} isLastMessage={true} onDelete={() => {}} />
                         )}
                     </div>
                 </div>
@@ -576,7 +592,8 @@ function App() {
                         maxLength={MAX_INPUT_LENGTH}
                         onOpenUrlModal={() => setIsUrlModalOpen(true)}
                         onFileChange={handleFileChange}
-                        hasAttachment={!!attachment}
+                        attachment={attachment}
+                        onRemoveAttachment={() => setAttachment(null)}
                         isAutoScrollEnabled={isAutoScrollEnabled}
                         onToggleAutoScroll={() => setIsAutoScrollEnabled(p => !p)}
                         isSuggestionsEnabled={isSuggestionsEnabled}
@@ -602,7 +619,7 @@ function App() {
             onClose={() => setDeleteCandidateId(null)}
             onConfirm={handleDelete}
             title={deleteCandidateId?.startsWith('session-') ? "Confirm Thread Purge" : "Confirm Deletion"}
-            bodyText={deleteCandidateId?.startsWith('session-') ? "This will permanently erase this cognitive thread. This action cannot be undone." : "This will delete the selected message and the AI's response, altering the conversational context. This action cannot be undone."}
+            bodyText={deleteCandidateId?.startsWith('session-') ? "This will permanently erase this cognitive thread. This action cannot be undone." : "This will delete the selected message and its subsequent AI response, altering the conversational context. This action cannot be undone."}
             confirmText={deleteCandidateId?.startsWith('session-') ? "Purge Thread" : "Delete & Proceed"}
         />
     </div>

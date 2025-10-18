@@ -1,6 +1,8 @@
+
 import React, { forwardRef, useState, useRef, useEffect } from 'react';
 import AutoResizeTextarea from './AutoResizeTextarea';
 import { SendIcon, ClearIcon, LinkIcon, PaperclipIcon, AutoScrollOnIcon, AutoScrollOffIcon, SuggestionsOnIcon, SuggestionsOffIcon, SettingsIcon, ThoughtIcon, DistillIcon } from './IconComponents';
+import { FileContext, UrlContext } from '../types';
 
 interface ChatInputProps {
   input: string;
@@ -10,7 +12,8 @@ interface ChatInputProps {
   maxLength: number;
   onOpenUrlModal: () => void;
   onFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  hasAttachment: boolean;
+  attachment: FileContext | UrlContext | null;
+  onRemoveAttachment: () => void;
   isAutoScrollEnabled: boolean;
   onToggleAutoScroll: () => void;
   isSuggestionsEnabled: boolean;
@@ -19,16 +22,35 @@ interface ChatInputProps {
   onDistillMemory: () => void;
 }
 
+const AttachmentPill: React.FC<{
+    attachment: FileContext | UrlContext;
+    onRemove: () => void;
+}> = ({ attachment, onRemove }) => {
+    const isFile = 'file' in attachment;
+    const name = isFile ? attachment.file.name : attachment.url;
+    return (
+        <div className="attached-url-pill">
+            {isFile ? <PaperclipIcon className="h-4 w-4" /> : <LinkIcon className="h-4 w-4" />}
+            <span className="url-text">{name}</span>
+            <button onClick={onRemove} className="remove-url-button" aria-label="Remove attachment">
+                &times;
+            </button>
+        </div>
+    );
+};
+
+
 const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
   ({ 
     input, setInput, onSendMessage, isLoading, maxLength, onOpenUrlModal, onFileChange,
-    hasAttachment, isAutoScrollEnabled, onToggleAutoScroll, isSuggestionsEnabled, onToggleSuggestions,
+    attachment, onRemoveAttachment, isAutoScrollEnabled, onToggleAutoScroll, isSuggestionsEnabled, onToggleSuggestions,
     onAutonomousThought, onDistillMemory
   }, ref) => {
     const [isFocused, setIsFocused] = useState(false);
     const [isToolsOpen, setIsToolsOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const toolsRef = useRef<HTMLDivElement>(null);
+    const hasAttachment = !!attachment;
     const isOverLimit = input.length > maxLength;
 
     useEffect(() => {
@@ -68,6 +90,7 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
     return (
       <form onSubmit={handleSubmit} className="max-w-4xl mx-auto relative">
+        {attachment && <AttachmentPill attachment={attachment} onRemove={onRemoveAttachment} />}
         <div className={`chat-input-container ${isFocused ? 'is-focused' : ''} ${isOverLimit ? '!border-red-500' : ''}`}>
             <div className="flex items-center gap-2">
                 <div className="relative" ref={toolsRef}>

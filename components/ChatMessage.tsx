@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
 import { Author, ChatMessage as ChatMessageType, DisplayPart } from '../types';
-import { CopyIcon, CheckIcon, EditIcon } from './IconComponents';
+import { CopyIcon, CheckIcon, EditIcon, TrashIcon } from './IconComponents';
 import AutoResizeTextarea from './AutoResizeTextarea';
 import { MessageRenderer } from './MessageRenderer';
 
@@ -15,12 +16,13 @@ interface ChatMessageProps {
   onStartEdit: () => void;
   onCancelEdit: () => void;
   onSaveEdit: (id: string, newText: string) => void;
+  onDelete: () => void;
   isLastMessage: boolean;
 }
 
 const COLLAPSE_THRESHOLD = 300; // in pixels
 
-const ChatMessage: React.FC<ChatMessageProps> = ({ message, isEditing, justEditedId, onStartEdit, onCancelEdit, onSaveEdit, isLastMessage }) => {
+const ChatMessage: React.FC<ChatMessageProps> = ({ message, isEditing, justEditedId, onStartEdit, onCancelEdit, onSaveEdit, onDelete, isLastMessage }) => {
   const messageTextContent = useMemo(() => getTextFromParts(message.parts), [message.parts]);
   const [editedText, setEditedText] = useState(messageTextContent);
   const isUser = message.author === Author.USER;
@@ -77,7 +79,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, isEditing, justEdite
       <div className="relative group max-w-2xl w-full">
          <MessageActions 
             isUser={isUser} 
-            onStartEdit={onStartEdit} 
+            onStartEdit={onStartEdit}
+            onDelete={onDelete}
             messageText={messageTextContent}
           />
         {isEditing && isUser ? (
@@ -141,10 +144,11 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, isEditing, justEdite
 interface MessageActionsProps {
   isUser: boolean;
   onStartEdit: () => void;
+  onDelete: () => void;
   messageText: string;
 }
 
-const MessageActions: React.FC<MessageActionsProps> = ({ isUser, onStartEdit, messageText }) => {
+const MessageActions: React.FC<MessageActionsProps> = ({ isUser, onStartEdit, onDelete, messageText }) => {
     const [hasCopied, setHasCopied] = useState(false);
     
     const handleCopy = () => {
@@ -163,6 +167,7 @@ const MessageActions: React.FC<MessageActionsProps> = ({ isUser, onStartEdit, me
             <button onClick={handleCopy} className="action-button" aria-label="Copy message">
                 {hasCopied ? <CheckIcon /> : <CopyIcon />}
             </button>
+            <button onClick={onDelete} className="action-button danger" aria-label="Delete message"><TrashIcon /></button>
         </div>
     );
 }
