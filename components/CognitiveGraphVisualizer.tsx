@@ -130,7 +130,8 @@ const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({
     const canvas = canvasRef.current;
     if(sim && canvas){
         const { width, height } = canvas.getBoundingClientRect();
-        const centerForce = sim.force<ForceCenter<GraphNode>>('center');
+        // Fix: Use type casting to work around potential TS issues with d3 generic force method.
+        const centerForce = sim.force('center') as ForceCenter<GraphNode> | undefined;
         if (centerForce) {
             centerForce.x(width / 2).y(height / 2);
         }
@@ -142,7 +143,8 @@ const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({
         setLinks(newLinks);
 
         sim.nodes(newNodes);
-        sim.force<ForceLink<GraphNode, GraphLink>>('link')?.links(newLinks);
+        // Fix: Use type casting to work around potential TS issues with d3 generic force method.
+        (sim.force('link') as ForceLink<GraphNode, GraphLink> | undefined)?.links(newLinks);
         
         if (isSimulating) {
             sim.alpha(1).restart();

@@ -9,7 +9,7 @@ export enum Author {
 
 // Re-exporting the Part type from the SDK for consistency, 
 // but we'll add our own fileName for UI purposes.
-export type DisplayPart = Part | { inlineData: { mimeType: string; data: string; fileName: string; } };
+export type DisplayPart = Part | { inlineData: { mimeType: string; data: string; fileName:string; } };
 
 export interface ChatMessage {
   id: string;
@@ -28,10 +28,8 @@ export interface FileContext {
   mimeType: string;
 }
 
+// Fix: Add Session type definition to resolve import error in SessionManager.tsx
 export interface Session {
   id: string;
   name: string;
-  createdAt: string;
-  messages: ChatMessage[];
-  graphData: CognitiveGraphData;
 }

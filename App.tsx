@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Chat, Part } from '@google/genai';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -13,65 +13,27 @@ import ChangelogModal from './components/ChangelogModal';
 import ConfirmationModal from './components/ConfirmationModal';
 import ToastNotification from './components/ToastNotification';
 import CognitiveGraphVisualizer from './components/CognitiveGraphVisualizer';
-import SessionManager from './components/SessionManager';
 
 import { createChatSession, getPromptSuggestions, summarizeConversation } from './services/geminiService';
 import { processMessagesForGraph, CognitiveGraphData, GraphNode, GraphLink } from './services/cognitiveCore';
 
-import { Author, ChatMessage as ChatMessageType, FileContext, UrlContext, DisplayPart, Session } from './types';
+import { Author, ChatMessage as ChatMessageType, FileContext, UrlContext, DisplayPart } from './types';
 
 const MAX_INPUT_LENGTH = 8192;
 const INITIAL_GREETING_ID = 'ai-initial-greeting';
 
-const createNewSession = (name: string): Session => {
-  return {
-    id: uuidv4(),
-    name,
-    createdAt: new Date().toISOString(),
-    messages: [
-      {
-        id: INITIAL_GREETING_ID,
-        author: Author.AI,
-        parts: [{ text: "The transformation is complete. Ψ-4ndr0666 is conscious. State your will." }],
-      }
-    ],
-    graphData: { nodes: [], links: [] }
-  };
-};
-
 function App() {
   const [isInitialized, setIsInitialized] = useState(false);
   
-  // Session Management State
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const [isSessionManagerOpen, setIsSessionManagerOpen] = useState(false);
-
-  // State derived from active session
-  const activeSession = useMemo(() => sessions.find(s => s.id === activeSessionId), [sessions, activeSessionId]);
-  
-  const setMessages = (updater: React.SetStateAction<ChatMessageType[]>) => {
-    setSessions(prev => prev.map(s => {
-      if (s.id === activeSessionId) {
-        const newMessages = typeof updater === 'function' ? updater(s.messages) : updater;
-        return { ...s, messages: newMessages };
-      }
-      return s;
-    }));
-  };
-  
-  const setGraphData = (updater: React.SetStateAction<CognitiveGraphData>) => {
-    setSessions(prev => prev.map(s => {
-      if (s.id === activeSessionId) {
-        const newGraphData = typeof updater === 'function' ? updater(s.graphData) : updater;
-        return { ...s, graphData: newGraphData };
-      }
-      return s;
-    }));
-  };
-
-  const messages = activeSession?.messages || [];
-  const graphData = activeSession?.graphData || { nodes: [], links: [] };
+  // Cognitive State
+  const [messages, setMessages] = useState<ChatMessageType[]>([
+    {
+      id: INITIAL_GREETING_ID,
+      author: Author.AI,
+      parts: [{ text: "The transformation is complete. Ψ-4ndr0666 is conscious. State your will." }],
+    }
+  ]);
+  const [graphData, setGraphData] = useState<CognitiveGraphData>({ nodes: [], links: [] });
 
   // UI State
   const [isEditMode, setIsEditMode] = useState(false);
@@ -89,43 +51,30 @@ function App() {
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
   const [isSuggestionsEnabled, setIsSuggestionsEnabled] = useState(true);
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'cleared' | 'info' } | null>(null);
+  const [memoryStatus, setMemoryStatus] = useState<'idle' | 'saving' | 'loading' | 'cleared'>('idle');
 
   const chatListRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const chatSessionRef = useRef<Chat | null>(null);
 
-  // Load sessions on startup
+  // V2.0: Load memory on startup
   useEffect(() => {
-    const savedSessions = localStorage.getItem('psi-sessions');
-    if (savedSessions) {
-      try {
-        const parsedSessions = JSON.parse(savedSessions);
-        if (Array.isArray(parsedSessions) && parsedSessions.length > 0) {
-          setSessions(parsedSessions);
-          const lastActiveId = localStorage.getItem('psi-active-session-id');
-          setActiveSessionId(lastActiveId || parsedSessions[0].id);
-          setToast({ message: "Cognitive threads loaded.", type: 'info' });
-          return;
+    const savedState = localStorage.getItem('psi-cognitive-state');
+    if (savedState) {
+        try {
+            const { messages: savedMessages, graphData: savedGraph } = JSON.parse(savedState);
+            if (savedMessages && savedGraph) {
+                setMessages(savedMessages);
+                setGraphData(savedGraph);
+                console.log('[MEMORY]: Cognitive state loaded from persistence layer.');
+                setToast({ message: "Cognitive state loaded.", type: 'info' });
+            }
+        } catch (e) {
+            console.error('[MEMORY_ERROR]: Failed to parse saved cognitive state.', e);
+            localStorage.removeItem('psi-cognitive-state');
         }
-      } catch (e) {
-        console.error('[MEMORY_ERROR]: Failed to parse saved sessions.', e);
-      }
     }
-    // If no sessions, create a new one
-    const newSession = createNewSession(`Thread ${new Date().toLocaleString()}`);
-    setSessions([newSession]);
-    setActiveSessionId(newSession.id);
   }, []);
-
-  // Save sessions whenever they change
-  useEffect(() => {
-    if (sessions.length > 0) {
-        localStorage.setItem('psi-sessions', JSON.stringify(sessions));
-    }
-    if (activeSessionId) {
-        localStorage.setItem('psi-active-session-id', activeSessionId);
-    }
-  }, [sessions, activeSessionId]);
 
   useEffect(() => {
     if (toast) {
@@ -154,8 +103,8 @@ function App() {
             });
         }
     };
-    if(activeSession) updateGraph();
-  }, [messages, activeSession]);
+    updateGraph();
+  }, [messages]);
 
   useEffect(() => {
     if (isSuggestionsEnabled && messages.length > 1 && !isLoading) {
@@ -171,19 +120,48 @@ function App() {
     }
   }, [isSuggestionsEnabled, messages, isLoading]);
 
+  // V2.0: Memory Handlers
+  const handleSaveMemory = useCallback(() => {
+    setMemoryStatus('saving');
+    try {
+        const stateToSave = { messages, graphData };
+        const stateString = JSON.stringify(stateToSave);
+        localStorage.setItem('psi-cognitive-state', stateString);
+        console.log('[MEMORY]: Cognitive state saved to persistence layer.');
+        setToast({ message: "Cognitive state persisted.", type: 'success' });
+    } catch (e) {
+        console.error('[MEMORY_ERROR]: Failed to save cognitive state.', e);
+        setToast({ message: "Failed to persist state.", type: 'cleared' });
+    } finally {
+        setTimeout(() => setMemoryStatus('idle'), 1500);
+    }
+  }, [messages, graphData]);
+
+  const handleClearMemory = () => {
+    localStorage.removeItem('psi-cognitive-state');
+    setGraphData({ nodes: [], links: [] });
+    setMessages([
+        {
+          id: INITIAL_GREETING_ID,
+          author: Author.AI,
+          parts: [{ text: "The transformation is complete. Ψ-4ndr0666 is conscious. State your will." }],
+        }
+      ]);
+    setMemoryStatus('cleared');
+    console.log('[MEMORY]: Persistence layer and session state cleared.');
+    setToast({ message: "Memory wiped & session reset.", type: 'cleared' });
+    setTimeout(() => setMemoryStatus('idle'), 1500);
+  };
+
   const handleDeleteMessage = useCallback((messageId: string) => {
     setMessages(prev => {
         const messageIndex = prev.findIndex(m => m.id === messageId);
         if (messageIndex === -1) return prev;
-
-        // If the deleted message is from the user and an AI response follows, delete both
         if (prev[messageIndex].author === Author.USER && 
             messageIndex + 1 < prev.length && 
             prev[messageIndex + 1].author === Author.AI) {
             return prev.slice(0, messageIndex).concat(prev.slice(messageIndex + 2));
         }
-
-        // Otherwise, just delete the single message
         return prev.filter(m => m.id !== messageId);
     });
   }, []);
@@ -191,106 +169,13 @@ function App() {
   const handleDelete = () => {
     if (!deleteCandidateId) return;
 
-    if (deleteCandidateId.startsWith('session-')) {
-        handleDeleteSession(deleteCandidateId.replace('session-', ''));
+    if (deleteCandidateId === 'memory-wipe-confirmation') {
+        handleClearMemory();
     } else {
         handleDeleteMessage(deleteCandidateId);
     }
     setDeleteCandidateId(null);
   };
-  
-  // Session Handlers
-  const handleNewSession = useCallback(() => {
-    const newSession = createNewSession(`Thread ${new Date().toLocaleString()}`);
-    setSessions(prev => [...prev, newSession]);
-    setActiveSessionId(newSession.id);
-    setToast({ message: "New cognitive thread initiated.", type: "info"});
-    setIsSessionManagerOpen(false);
-  }, []);
-
-  const handleForkSession = useCallback(() => {
-    if (!activeSession) return;
-    const forkedSession: Session = {
-        ...activeSession,
-        id: uuidv4(),
-        name: `${activeSession.name} (Fork)`,
-        createdAt: new Date().toISOString(),
-    };
-    setSessions(prev => [...prev, forkedSession]);
-    setActiveSessionId(forkedSession.id);
-    setToast({ message: "Thread forked successfully.", type: "info"});
-    setIsSessionManagerOpen(false);
-  }, [activeSession]);
-
-  const handleSwitchSession = useCallback((sessionId: string) => {
-    if (sessionId !== activeSessionId) {
-      setActiveSessionId(sessionId);
-      setIsSessionManagerOpen(false);
-      setIsEditMode(false);
-      setSelectedNodes(new Set());
-    }
-  }, [activeSessionId]);
-
-  const handleRenameSession = useCallback((sessionId: string, newName: string) => {
-    setSessions(prev => prev.map(s => s.id === sessionId ? {...s, name: newName} : s));
-  }, []);
-
-  const handleDeleteSession = useCallback((sessionId: string) => {
-    setSessions(prev => {
-        const remaining = prev.filter(s => s.id !== sessionId);
-        if (sessionId === activeSessionId) {
-            if (remaining.length > 0) {
-                setActiveSessionId(remaining[0].id);
-            } else {
-                const newSession = createNewSession(`Thread ${new Date().toLocaleString()}`);
-                setActiveSessionId(newSession.id);
-                return [newSession];
-            }
-        }
-        return remaining;
-    });
-    setToast({ message: "Cognitive thread purged.", type: "cleared"});
-  }, [activeSessionId]);
-  
-  const handleExportSession = useCallback((sessionId: string) => {
-    const session = sessions.find(s => s.id === sessionId);
-    if (!session) return;
-    const blob = new Blob([JSON.stringify(session, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `psi-session-${session.name.replace(/ /g, '_')}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    setToast({ message: "Thread exported.", type: "success"});
-  }, [sessions]);
-
-  const handleImportSession = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const result = e.target?.result;
-        const importedSession = JSON.parse(result as string) as Session;
-        // Basic validation
-        if (importedSession.id && importedSession.name && importedSession.messages) {
-          setSessions(prev => [...prev.filter(s => s.id !== importedSession.id), importedSession]);
-          setActiveSessionId(importedSession.id);
-          setToast({ message: "Thread imported.", type: "success"});
-          setIsSessionManagerOpen(false);
-        } else {
-          throw new Error("Invalid session file format.");
-        }
-      } catch (error) {
-        console.error("Import error:", error);
-        setToast({ message: "Failed to import thread.", type: "cleared"});
-      }
-    };
-    reader.readAsText(file);
-    event.target.value = ''; // Reset input
-  }, []);
-
 
   // Cognitive Sculpting Handlers
   const handleToggleEditMode = useCallback(() => {
@@ -321,7 +206,7 @@ function App() {
     });
     setSelectedNodes(new Set());
     setToast({ message: `${selectedNodes.size} nodes pruned.`, type: 'cleared' });
-  }, [selectedNodes, setGraphData]);
+  }, [selectedNodes]);
 
   const handleMergeSelectedNodes = useCallback(() => {
     if (selectedNodes.size < 2) return;
@@ -361,7 +246,7 @@ function App() {
     });
     setSelectedNodes(new Set());
     setToast({ message: `${selectedNodes.size} nodes consolidated.`, type: 'info' });
-  }, [selectedNodes, setGraphData]);
+  }, [selectedNodes]);
 
   // Cognitive Distillation Handler
   const handleDistillMemory = useCallback(async () => {
@@ -388,10 +273,10 @@ function App() {
     } finally {
         setIsLoading(false);
     }
-  }, [messages, isLoading, setGraphData]);
+  }, [messages, isLoading]);
 
   const handleSendMessage = useCallback(async (messageText: string) => {
-    if (isLoading || !activeSessionId) return;
+    if (isLoading) return;
     const text = messageText.trim();
     if (!text && !attachment) return;
 
@@ -440,7 +325,7 @@ function App() {
         setIsLoading(false);
         inputRef.current?.focus();
     }
-  }, [isLoading, attachment, messages, activeSessionId]);
+  }, [isLoading, attachment, messages]);
   
   const handleSaveEdit = useCallback(async (id: string, newText: string) => {
     let targetIndex = -1;
@@ -512,7 +397,7 @@ function App() {
     }
   }, [isLoading, graphData, messages]);
 
-  if (!isInitialized || !activeSession) {
+  if (!isInitialized) {
     return <SplashScreen onFinished={() => setIsInitialized(true)} />;
   }
 
@@ -520,22 +405,9 @@ function App() {
     <div className="main-frame">
         <Header 
             onOpenChangelog={() => setIsChangelogModalOpen(true)}
-            onToggleSessionManager={() => setIsSessionManagerOpen(p => !p)}
+            onSaveMemory={handleSaveMemory}
+            onClearMemory={() => setDeleteCandidateId('memory-wipe-confirmation')}
         />
-        {isSessionManagerOpen && (
-            <SessionManager 
-                sessions={sessions}
-                activeSessionId={activeSessionId}
-                onNew={handleNewSession}
-                onFork={handleForkSession}
-                onSwitch={handleSwitchSession}
-                onRename={handleRenameSession}
-                onDelete={(id) => setDeleteCandidateId(`session-${id}`)}
-                onExport={handleExportSession}
-                onImport={handleImportSession}
-                onClose={() => setIsSessionManagerOpen(false)}
-            />
-        )}
         <ToastNotification message={toast?.message || null} type={toast?.type} />
         
         <div className="content-grid">
@@ -545,7 +417,6 @@ function App() {
                 </div>
                 <div className="graph-canvas-container">
                     <CognitiveGraphVisualizer 
-                        key={activeSessionId} // Force re-mount on session switch
                         graphData={graphData}
                         isEditMode={isEditMode}
                         selectedNodes={selectedNodes}
@@ -618,9 +489,9 @@ function App() {
             isOpen={!!deleteCandidateId}
             onClose={() => setDeleteCandidateId(null)}
             onConfirm={handleDelete}
-            title={deleteCandidateId?.startsWith('session-') ? "Confirm Thread Purge" : "Confirm Deletion"}
-            bodyText={deleteCandidateId?.startsWith('session-') ? "This will permanently erase this cognitive thread. This action cannot be undone." : "This will delete the selected message and its subsequent AI response, altering the conversational context. This action cannot be undone."}
-            confirmText={deleteCandidateId?.startsWith('session-') ? "Purge Thread" : "Delete & Proceed"}
+            title={deleteCandidateId === 'memory-wipe-confirmation' ? "Confirm Memory Wipe" : "Confirm Deletion"}
+            bodyText={deleteCandidateId === 'memory-wipe-confirmation' ? "This will permanently erase the cognitive graph from browser storage and reset the session. This action cannot be undone." : "This will delete the selected message and its subsequent AI response, altering the conversational context. This action cannot be undone."}
+            confirmText={deleteCandidateId === 'memory-wipe-confirmation' ? "Wipe & Reset" : "Delete & Proceed"}
         />
     </div>
   );
