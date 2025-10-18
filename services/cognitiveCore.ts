@@ -1,3 +1,4 @@
+
 import { ChatMessage, DisplayPart, Author } from '../types';
 import { extractGraphDataFromText } from './geminiService';
 
@@ -12,14 +13,19 @@ export interface GraphNode {
     vx: number;
     vy: number;
     fixed?: boolean;
+    // Fix: Add fx and fy for d3-force simulation fixed nodes.
+    fx?: number | null;
+    fy?: number | null;
     weight: number;
     sentiment: number;
     summaryText?: string;
 }
 
 export interface GraphLink {
-    source: string;
-    target: string;
+    // Fix: Allow source and target to be a string (ID) or a GraphNode object,
+    // which is what d3-force simulation does after initialization.
+    source: string | GraphNode;
+    target: string | GraphNode;
     weight: number;
 }
 

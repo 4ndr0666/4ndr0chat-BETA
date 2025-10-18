@@ -13,8 +13,9 @@ import ChangelogModal from './components/ChangelogModal';
 import ConfirmationModal from './components/ConfirmationModal';
 import ToastNotification from './components/ToastNotification';
 import CognitiveGraphVisualizer from './components/CognitiveGraphVisualizer';
+import { GraphNode, GraphLink } from './services/cognitiveCore';
 
-import { createChatSession, getPromptSuggestions } from './services/geminiService';
+import { createChatSession, getPromptSuggestions, summarizeConversation } from './services/geminiService';
 import { processMessagesForGraph, CognitiveGraphData } from './services/cognitiveCore';
 
 import { Author, ChatMessage as ChatMessageType, FileContext, UrlContext, DisplayPart } from './types';
@@ -35,6 +36,10 @@ function App() {
   const [messages, setMessages] = useState<ChatMessageType[]>(initialMessages);
   const [graphData, setGraphData] = useState<CognitiveGraphData>({ nodes: [], links: [] });
   const [memoryStatus, setMemoryStatus] = useState<'idle' | 'saving' | 'loading' | 'cleared'>('idle');
+
+  // State for Cognitive Sculpting (Directive V2.6)
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
 
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -58,7 +63,7 @@ function App() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const chatSessionRef = useRef<Chat | null>(null);
 
-  // Cognitive Persistence (Directive V2.0) - Auto-loading on startup
+  // Cognitive Persistence (Directive V2.0)
   useEffect(() => {
     const savedGraph = localStorage.getItem('psi-cognitive-graph');
     const savedMessages = localStorage.getItem('psi-chat-messages');
@@ -96,7 +101,7 @@ function App() {
   // Graph processing
   useEffect(() => {
     const updateGraph = async () => {
-        if (messages.length > 1) { // Don't process only the initial greeting
+        if (messages.length > 1) {
             const newGraph = await processMessagesForGraph(messages);
             setGraphData(prevGraph => {
                 const existingNodes = new Map(prevGraph.nodes.map(n => [n.id, n]));
@@ -157,9 +162,151 @@ function App() {
     if (deleteCandidateId === 'memory-wipe-confirmation') {
         handleClearMemory();
     }
-    // Future message deletion logic can go here
     setDeleteCandidateId(null);
   };
+
+  // Cognitive Sculpting Handlers (Directive V2.6)
+  const handleToggleEditMode = useCallback(() => {
+    setIsEditMode(prev => {
+        if (prev) setSelectedNodes(new Set()); // Clear selection when exiting edit mode
+        return !prev;
+    });
+  }, []);
+
+  const handleNodeSelect = useCallback((nodeId: string) => {
+    setSelectedNodes(prev => {
+        const newSelection = new Set(prev);
+        if (newSelection.has(nodeId)) {
+            newSelection.delete(nodeId);
+        } else {
+            newSelection.add(nodeId);
+        }
+        return newSelection;
+    });
+  }, []);
+
+  const handleDeleteSelectedNodes = useCallback(() => {
+    if (selectedNodes.size === 0) return;
+    setGraphData(prev => {
+        const remainingNodes = prev.nodes.filter(n => !selectedNodes.has(n.id));
+        const remainingLinks = prev.links.filter(l => 
+            !selectedNodes.has(typeof l.source === 'string' ? l.source : (l.source as GraphNode).id) && 
+            !selectedNodes.has(typeof l.target === 'string' ? l.target : (l.target as GraphNode).id)
+        );
+        return { nodes: remainingNodes, links: remainingLinks };
+    });
+    setSelectedNodes(new Set());
+    setToast({ message: `${selectedNodes.size} nodes pruned.`, type: 'cleared' });
+  }, [selectedNodes]);
+
+  const handleMergeSelectedNodes = useCallback(() => {
+    if (selectedNodes.size < 2) return;
+
+    const getNodeId = (node: GraphNode | string): string => {
+        return typeof node === 'string' ? node : node.id;
+    };
+
+    setGraphData(prev => {
+        const nodesToMerge = prev.nodes.filter(n => selectedNodes.has(n.id));
+        const remainingNodes = prev.nodes.filter(n => !selectedNodes.has(n.id));
+
+        const primaryNode = nodesToMerge[0];
+        
+        const newLabel = nodesToMerge.map(n => n.label).slice(0, 3).join(' / ');
+        const totalWeight = nodesToMerge.reduce((acc, n) => acc + n.weight, 0);
+        const totalSentiment = nodesToMerge.reduce((acc, n) => acc + n.sentiment * n.weight, 0);
+
+        const mergedNode: GraphNode = {
+            ...primaryNode,
+            id: `merged-${uuidv4()}`,
+            label: newLabel,
+            weight: totalWeight / nodesToMerge.length,
+            sentiment: totalSentiment / totalWeight,
+            size: primaryNode.size + nodesToMerge.length,
+        };
+
+        const mergedIds = new Set(nodesToMerge.map(n => n.id));
+        const newLinks = prev.links
+            .filter(l => {
+                const sourceId = getNodeId(l.source);
+                const targetId = getNodeId(l.target);
+                return !mergedIds.has(sourceId) || !mergedIds.has(targetId);
+            })
+            .map(l => {
+                const newLink = { ...l };
+                if (mergedIds.has(getNodeId(l.source))) newLink.source = mergedNode.id;
+                if (mergedIds.has(getNodeId(l.target))) newLink.target = mergedNode.id;
+                return newLink;
+            });
+
+        return {
+            nodes: [...remainingNodes, mergedNode],
+            links: Array.from(new Map(newLinks.map(l => [`${getNodeId(l.source)}-${getNodeId(l.target)}`, l])).values()),
+        };
+    });
+
+    setSelectedNodes(new Set());
+    setToast({ message: `${selectedNodes.size} nodes consolidated.`, type: 'info' });
+  }, [selectedNodes]);
+
+  // Cognitive Distillation Handler (Directive V2.7)
+  const handleDistillMemory = useCallback(async () => {
+    if (isLoading || messages.length <= 1) return;
+    setIsLoading(true);
+    setToast({ message: "Distilling core memory...", type: 'info' });
+
+    try {
+        const { summary, key_themes } = await summarizeConversation(messages);
+        
+        setGraphData(prev => {
+            const summaryNodeId = `summary-${uuidv4()}`;
+            const summaryNode: GraphNode = {
+                id: summaryNodeId,
+                label: "Core Memory",
+                type: 'summary',
+                size: 20,
+                weight: 1.0,
+                sentiment: 0,
+                summaryText: summary,
+                x: 250,
+                y: 250,
+                vx: 0,
+                vy: 0,
+                fx: 250,
+                fy: 250,
+            };
+            
+            // Fix: Refactor map().filter() to flatMap() to resolve TypeScript error and improve clarity.
+            const themeLinks: GraphLink[] = key_themes.flatMap((theme): GraphLink[] => {
+                const themeId = `concept-${theme.toLowerCase().replace(/\s/g, '-')}`;
+                if (prev.nodes.some(n => n.id === themeId)) {
+                    return [{ source: summaryNodeId, target: themeId, weight: 0.9 }];
+                }
+                return [];
+            });
+            
+            setTimeout(() => {
+                setGraphData(currentGraph => ({
+                    ...currentGraph,
+                    nodes: currentGraph.nodes.map(n => n.id === summaryNodeId ? { ...n, fx: null, fy: null } : n)
+                }));
+            }, 5000);
+            
+            return {
+                nodes: [...prev.nodes, summaryNode],
+                links: [...prev.links, ...themeLinks]
+            };
+        });
+
+        setToast({ message: "Core memory distilled.", type: 'success' });
+
+    } catch (e) {
+        console.error("Distillation error:", e);
+        setToast({ message: "Memory distillation failed.", type: 'cleared' });
+    } finally {
+        setIsLoading(false);
+    }
+  }, [messages, isLoading]);
 
 
   const handleSendMessage = useCallback(async (messageText: string) => {
@@ -331,7 +478,15 @@ function App() {
                     <h2 className="graph-title">Cognitive Map</h2>
                 </div>
                 <div className="graph-canvas-container">
-                    <CognitiveGraphVisualizer graphData={graphData} />
+                    <CognitiveGraphVisualizer 
+                        graphData={graphData}
+                        isEditMode={isEditMode}
+                        selectedNodes={selectedNodes}
+                        onNodeClick={handleNodeSelect}
+                        onToggleEditMode={handleToggleEditMode}
+                        onDeleteSelected={handleDeleteSelectedNodes}
+                        onMergeSelected={handleMergeSelectedNodes}
+                    />
                 </div>
             </div>
             <div className="chat-panel panel">
@@ -375,7 +530,7 @@ function App() {
                         isSuggestionsEnabled={isSuggestionsEnabled}
                         onToggleSuggestions={() => setIsSuggestionsEnabled(p => !p)}
                         onAutonomousThought={handleAutonomousThought}
-                        onDistillMemory={() => { /* Placeholder */ }}
+                        onDistillMemory={handleDistillMemory}
                     />
                 </div>
             </div>

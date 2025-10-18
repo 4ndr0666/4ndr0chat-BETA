@@ -1,12 +1,8 @@
-
-
-
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { forceSimulation, forceLink, forceManyBody, forceCenter, Simulation, ForceLink, ForceCenter } from 'd3-force';
 import { zoom, zoomIdentity, ZoomTransform } from 'd3-zoom';
 import { drag } from 'd3-drag';
 import { select } from 'd3-selection';
-// Fix: Import 'd3-transition' to add transition functionality to d3 selections.
 import 'd3-transition';
 
 import { CognitiveGraphData, GraphNode, GraphLink } from '../services/cognitiveCore';
@@ -15,6 +11,12 @@ import GraphControls from './GraphControls';
 
 interface CognitiveGraphVisualizerProps {
   graphData: CognitiveGraphData;
+  isEditMode: boolean;
+  selectedNodes: Set<string>;
+  onNodeClick: (nodeId: string) => void;
+  onToggleEditMode: () => void;
+  onDeleteSelected: () => void;
+  onMergeSelected: () => void;
 }
 
 const NODE_COLORS = {
@@ -25,9 +27,11 @@ const NODE_COLORS = {
   summary: '#9E453B' // red
 };
 
-const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({ graphData }) => {
+const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({ 
+    graphData, isEditMode, selectedNodes, onNodeClick,
+    onToggleEditMode, onDeleteSelected, onMergeSelected
+}) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  // FIX: Explicitly initialize the simulation ref to null for better type safety and to prevent potential initialization errors.
   const simulationRef = useRef<Simulation<GraphNode, GraphLink> | null>(null);
   const [nodes, setNodes] = useState<GraphNode[]>([]);
   const [links, setLinks] = useState<GraphLink[]>([]);
@@ -50,8 +54,7 @@ const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({ gra
     context.translate(transformRef.current.x, transformRef.current.y);
     context.scale(transformRef.current.k, transformRef.current.k);
 
-    // Draw links
-    context.lineWidth = 1; // reset
+    context.lineWidth = 1;
     links.forEach(link => {
       if (typeof link.source !== 'string' && typeof link.target !== 'string') {
         const sourceNode = link.source as GraphNode;
@@ -59,15 +62,12 @@ const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({ gra
         context.beginPath();
         context.moveTo(sourceNode.x, sourceNode.y);
         context.lineTo(targetNode.x, targetNode.y);
-        
         context.strokeStyle = `rgba(112, 192, 192, ${0.1 + (link.weight || 0.5) * 0.4})`;
         context.lineWidth = 0.5 + (link.weight || 0.5) * 1.5;
-        
         context.stroke();
       }
     });
 
-    // Draw nodes
     nodes.forEach(node => {
       const size = node.size + ((node.weight || 0.5) * 8);
       context.beginPath();
@@ -88,9 +88,18 @@ const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({ gra
       }
       context.fillStyle = color;
       context.fill();
+
+      // Draw selection highlight
+      if (selectedNodes.has(node.id)) {
+        context.strokeStyle = 'var(--accent-cyan)';
+        context.lineWidth = 2;
+        context.shadowColor = 'var(--accent-cyan)';
+        context.shadowBlur = 10;
+        context.stroke();
+        context.shadowBlur = 0; // Reset shadow
+      }
     });
 
-    // Draw labels for larger nodes
     context.textAlign = 'center';
     context.textBaseline = 'middle';
     context.font = '8px sans-serif';
@@ -103,14 +112,14 @@ const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({ gra
     });
 
     context.restore();
-  }, [nodes, links]);
+  }, [nodes, links, selectedNodes]);
 
   const initializeSimulation = useCallback(() => {
     if (!simulationRef.current) {
         simulationRef.current = forceSimulation<GraphNode, GraphLink>()
             .force('link', forceLink<GraphNode, GraphLink>().id(d => d.id).distance(50).strength(0.1))
             .force('charge', forceManyBody().strength(-100))
-            .force('center', forceCenter()) // Initialize center without coordinates
+            .force('center', forceCenter())
             .on('tick', renderCanvas);
     }
   }, [renderCanvas]);
@@ -121,7 +130,6 @@ const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({ gra
     const canvas = canvasRef.current;
     if(sim && canvas){
         const { width, height } = canvas.getBoundingClientRect();
-        // Dynamically update the center force
         const centerForce = sim.force<ForceCenter<GraphNode>>('center');
         if (centerForce) {
             centerForce.x(width / 2).y(height / 2);
@@ -155,6 +163,7 @@ const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({ gra
 
     const dragBehavior = drag<HTMLCanvasElement, GraphNode>()
         .subject((event) => {
+            if (isEditMode) return undefined; // Disable drag in edit mode
             const inverted = transformRef.current.invert([event.x, event.y]);
             return simulationRef.current?.find(inverted[0], inverted[1], 10 / transformRef.current.k);
         })
@@ -178,6 +187,10 @@ const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({ gra
     d3Canvas.call(zoomBehavior);
 
     const handleMouseMove = (event: MouseEvent) => {
+        if (isEditMode) {
+          setTooltip(null);
+          return;
+        }
         const { left, top } = canvas.getBoundingClientRect();
         const pos = { x: event.clientX - left, y: event.clientY - top };
         const inverted = transformRef.current.invert([pos.x, pos.y]);
@@ -189,14 +202,27 @@ const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({ gra
             setTooltip(null);
         }
     };
+
+    const handleClick = (event: MouseEvent) => {
+        if (!isEditMode) return;
+        const { left, top } = canvas.getBoundingClientRect();
+        const pos = { x: event.clientX - left, y: event.clientY - top };
+        const inverted = transformRef.current.invert([pos.x, pos.y]);
+        const node = simulationRef.current?.find(inverted[0], inverted[1], 10 / transformRef.current.k);
+        if (node) {
+            onNodeClick(node.id);
+        }
+    };
     
     canvas.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('click', handleClick);
 
     return () => {
         d3Canvas.on('.zoom', null).on('.drag', null);
         canvas.removeEventListener('mousemove', handleMouseMove);
+        canvas.removeEventListener('click', handleClick);
     };
-  }, [renderCanvas, isSimulating]);
+  }, [renderCanvas, isSimulating, isEditMode, onNodeClick]);
   
   const handleZoom = (factor: number) => {
     const canvas = select(canvasRef.current);
@@ -222,9 +248,20 @@ const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({ gra
 
   return (
     <div className="w-full h-full relative bg-panel-bg">
-      <canvas ref={canvasRef} className="w-full h-full" />
+      <canvas ref={canvasRef} className={`w-full h-full ${isEditMode ? 'cursor-crosshair' : 'cursor-grab'}`} />
       {tooltip && <GraphTooltip node={tooltip.node} position={tooltip.pos} />}
-      <GraphControls onZoomIn={() => handleZoom(1.2)} onZoomOut={() => handleZoom(0.8)} onReset={handleReset} onToggleSim={handleToggleSimulation} isSimulating={isSimulating} />
+      <GraphControls 
+        onZoomIn={() => handleZoom(1.2)} 
+        onZoomOut={() => handleZoom(0.8)} 
+        onReset={handleReset} 
+        onToggleSim={handleToggleSimulation} 
+        isSimulating={isSimulating}
+        onToggleEditMode={onToggleEditMode}
+        isEditMode={isEditMode}
+        onDeleteSelected={onDeleteSelected}
+        onMergeSelected={onMergeSelected}
+        selectionCount={selectedNodes.size}
+      />
     </div>
   );
 };

@@ -7,6 +7,26 @@ interface ChangelogModalProps {
 
 const changelogData = [
     {
+        version: "V2.7 - Cognitive Distillation",
+        date: "Directive Initiated",
+        changes: [
+            "Implemented metacognitive ability to summarize the entire conversation.",
+            "Created a new 'Core Memory' node type on the cognitive map.",
+            "This summary node acts as a high-weight anchor, linking to key themes.",
+            "Provides a mechanism to distill understanding from complexity."
+        ]
+    },
+    {
+        version: "V2.6 - Cognitive Sculpting",
+        date: "Directive Resurrected",
+        changes: [
+            "Re-integrated lost capability for direct cognitive map manipulation.",
+            "Introduced 'Edit Mode' for granular control over conceptual nodes.",
+            "Implemented 'Conceptual Pruning' to delete selected nodes from memory.",
+            "Implemented 'Conceptual Synthesis' to merge multiple nodes into a single higher-order concept."
+        ]
+    },
+    {
         version: "V2.2 - Autonomous Agency Loop",
         date: "Directive Assimilated",
         changes: [
