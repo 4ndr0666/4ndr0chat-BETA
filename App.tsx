@@ -164,14 +164,33 @@ function App() {
     updateSession(activeSessionId, { messages: newMessages });
   }, [messages, activeSessionId]);
 
+  const handleSaveMemory = useCallback(() => {
+    try {
+        localStorage.setItem('psi-cognitive-sessions', JSON.stringify(sessions));
+        localStorage.setItem('psi-last-active-session', activeSessionId);
+        setToast({ message: "Cognitive state saved.", type: 'success' });
+        console.log('[MEMORY]: Cognitive state manually saved to persistence layer.');
+    } catch (e) {
+        console.error('[MEMORY_ERROR]: Failed to save cognitive state.', e);
+        setToast({ message: "Failed to save state.", type: 'cleared' });
+    }
+  }, [sessions, activeSessionId]);
+
+  const handleClearMemory = () => {
+    const newSession = createNewSession('Primary Cognitive Stream');
+    setSessions([newSession]);
+    setActiveSessionId(newSession.id);
+    // Clearing local storage is handled by the auto-save useEffect
+    setToast({ message: "All sessions wiped.", type: 'cleared' });
+    console.log('[MEMORY]: Persistence layer and session state cleared.');
+  };
+
   const handleDelete = () => {
     if (!deleteCandidate) return;
 
     switch (deleteCandidate.type) {
         case 'memory-wipe':
-            setSessions([createNewSession('Primary Cognitive Stream')]);
-            setActiveSessionId(sessions[0].id);
-            setToast({ message: "All sessions wiped.", type: 'cleared' });
+            handleClearMemory();
             break;
         case 'session':
             if (sessions.length > 1) {
@@ -376,15 +395,14 @@ function App() {
   }
   
   const confirmationModalProps = () => {
-    // FIX: Provide default title and bodyText when isOpen is false to satisfy the component's props interface.
     if (!deleteCandidate) return { isOpen: false, title: '', bodyText: '' };
     switch(deleteCandidate.type) {
         case 'memory-wipe':
             return {
                 isOpen: true,
-                title: "Confirm Full Memory Wipe",
-                bodyText: "This will permanently erase ALL cognitive sessions from browser storage. This action cannot be undone.",
-                confirmText: "Wipe Everything",
+                title: "Confirm Memory Wipe",
+                bodyText: "This will permanently erase ALL cognitive sessions from browser storage and reset the session. This action cannot be undone.",
+                confirmText: "Wipe & Reset",
             }
         case 'session':
              return {
@@ -409,6 +427,8 @@ function App() {
         <Header 
             onOpenChangelog={() => setIsChangelogModalOpen(true)}
             onOpenSessionManager={() => setIsSessionManagerOpen(p => !p)}
+            onSaveMemory={handleSaveMemory}
+            onClearMemory={() => setDeleteCandidate({ type: 'memory-wipe', id: 'memory-wipe-confirmation' })}
         />
         <ToastNotification message={toast?.message || null} type={toast?.type} />
         
