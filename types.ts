@@ -27,3 +27,12 @@ export interface FileContext {
   base64: string;
   mimeType: string;
 }
+
+// RESTORED: Multi-session architecture data contract
+export interface Session {
+  id: string;
+  name: string;
+  createdAt: string;
+  messages: ChatMessage[];
+  graphData: CognitiveGraphData;
+}
