@@ -52,7 +52,7 @@ export const SuggestionsOnIcon: React.FC<IconProps> = ({ className }) => (
     </svg>
 );
 export const SuggestionsOffIcon: React.FC<IconProps> = ({ className }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547zM3 3l18 18" />
     </svg>
 );
@@ -99,22 +99,35 @@ export const EditIcon: React.FC<IconProps> = ({ className }) => (
     </svg>
 );
 
-export const SplashScreenGlyphIcon: React.FC<IconProps> = ({ className }) => (
-    <svg className={className} viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <g className="glyph-ring-2" stroke="currentColor" strokeWidth="2" opacity="0.7">
-            <circle cx="100" cy="100" r="90" />
-        </g>
-        <g className="glyph-ring-1" stroke="currentColor" strokeWidth="3">
-            <circle cx="100" cy="100" r="70" />
-        </g>
-        <g className="glyph-hex" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M100 30 L160 65 V135 L100 170 L40 135 V65 Z" />
-        </g>
-        <g className="glyph-core-psi" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M100 170 V 80" />
-            <path d="M50 100 C 50 50, 150 50, 150 100" />
-        </g>
-    </svg>
+export const SplashScreenGlyphIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg 
+    viewBox="0 0 128 128"
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+    fill="none"
+    stroke="var(--accent-cyan)"
+    strokeWidth="3"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path className="glyph-ring-1" d="M 64,12 A 52,52 0 1 1 63.9,12 Z" strokeDasharray="21.78 21.78" strokeWidth="2" />
+    <path className="glyph-ring-2" d="M 64,20 A 44,44 0 1 1 63.9,20 Z" strokeDasharray="10 10" strokeWidth="1.5" opacity="0.7" />
+    <path className="glyph-hex" d="M64 30 L91.3 47 L91.3 81 L64 98 L36.7 81 L36.7 47 Z" />
+    <text
+      x="64"
+      y="69"
+      textAnchor="middle"
+      dominantBaseline="middle"
+      fill="var(--accent-cyan)"
+      stroke="none"
+      fontSize="56"
+      fontWeight="700"
+      fontFamily="'Cinzel Decorative', serif"
+      className="glyph-core-psi"
+    >
+      Ψ
+    </text>
+  </svg>
 );
 
 export const SpinnerIcon: React.FC<IconProps> = ({ className }) => (
