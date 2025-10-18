@@ -135,104 +135,49 @@
       .main-frame > div:first-of-type::before { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
       .main-frame > div:first-of-type::after { bottom: -1px; left: -1px; border-width: 0 0 2px 2px; }
 
-      /* NEW: Overall content grid */
+      /* V3.0 Layout: Persistent vertical split */
       .content-grid {
         display: grid;
         grid-template-columns: 1fr;
-        grid-template-rows: 250px 1fr;
+        grid-template-rows: minmax(0, 1fr) minmax(0, auto); /* Graph fills space, chat takes what it needs */
         gap: 1rem;
         flex: 1;
         min-height: 0;
-      }
-      @media (min-width: 1024px) {
-        .content-grid {
-          grid-template-columns: 4fr 6fr;
-          grid-template-rows: 1fr;
-        }
-      }
-      
-      /* UNIFIED PANEL STYLE */
-      .panel {
         background-color: var(--panel-bg);
         border: 1px solid var(--border-color);
         border-radius: 8px;
-        position: relative;
-        transition: background-color 0.3s ease, border-color 0.3s ease;
+        padding: 0.5rem;
       }
-
-      /* NEW: Chat Panel specific layout */
-      .chat-panel {
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
+      @media (min-width: 640px) {
+        .content-grid {
+            padding: 1rem;
+        }
       }
       
-      /* NEW: Cognitive Graph Panel */
-      .graph-panel {
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-        padding: 0.75rem;
-      }
-      .graph-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding-bottom: 0.5rem;
-        border-bottom: 1px dashed var(--border-color);
-      }
-      .graph-title {
-        text-align: center;
-        font-size: 0.8rem;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        color: var(--text-tertiary);
-        user-select: none;
-      }
-      .graph-canvas-container {
-        flex: 1;
+      .graph-workspace {
         position: relative;
         background-image: 
           linear-gradient(var(--grid-line-color) 1px, transparent 1px), 
           linear-gradient(to right, var(--grid-line-color) 1px, transparent 1px);
         background-size: 25px 25px;
         border-radius: 4px;
+        min-height: 200px;
       }
+      
+      .chat-workspace {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        border-top: 1px solid var(--border-color);
+        padding-top: 1rem;
+      }
+      
       .graph-canvas {
         position: absolute;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-      }
-
-
-      .side-decoration {
-        position: absolute;
-        top: 0;
-        right: 1rem;
-        bottom: 0;
-        width: 15px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        writing-mode: vertical-rl;
-        text-orientation: mixed;
-        font-size: 10px;
-        letter-spacing: 2px;
-        color: var(--accent-cyan-dark);
-        opacity: 0.5;
-        overflow: hidden;
-        white-space: nowrap;
-        user-select: none;
-        z-index: 3;
-      }
-
-      @media (max-width: 768px) {
-        .side-decoration {
-          display: none;
-        }
       }
 
       .font-heading {
@@ -396,10 +341,6 @@
       }
 
       .chat-container {
-        background-image: 
-          linear-gradient(var(--grid-line-color) 1px, transparent 1px), 
-          linear-gradient(to right, var(--grid-line-color) 1px, transparent 1px);
-        background-size: 40px 40px;
         position: relative;
         z-index: 1;
       }
@@ -486,6 +427,10 @@
         border-radius: 8px;
         position: relative;
       }
+      body.light .chat-bubble {
+        background-color: var(--panel-accent-bg);
+      }
+
 
       .message-collapsible {
         transition: max-height 0.5s cubic-bezier(0.25, 1, 0.5, 1);
@@ -533,10 +478,13 @@
         justify-content: center;
         padding: 0.5rem;
         border-radius: 6px;
-        background-color: var(--panel-accent-bg);
+        background-color: transparent;
         border: 1px solid var(--border-color);
         color: var(--text-secondary);
         transition: all 200ms ease;
+      }
+      body.light .action-button {
+        background-color: rgba(0,0,0,0.05);
       }
       .action-button:hover:not(:disabled) {
         background-color: rgba(21, 250, 250, 0.1);
@@ -569,12 +517,7 @@
 
       .input-panel {
         z-index: 10;
-        padding: 0.75rem;
-      }
-      @media (min-width: 640px) {
-        .input-panel {
-          padding: 1rem;
-        }
+        padding-top: 1rem;
       }
       
       .chat-input-container {

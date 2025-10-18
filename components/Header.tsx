@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChangelogIcon, SaveIcon, MemoryWipeIcon, StatusIndicatorIcon } from './IconComponents';
+import { MenuIcon, SaveIcon, MemoryWipeIcon, StatusIndicatorIcon } from './IconComponents';
 import ThemeSelector from './ThemeSelector';
 
 type MemoryStatus = 'idle' | 'saving' | 'loading' | 'cleared' | 'auto-saving';
@@ -32,7 +32,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenChangelog, onSaveMemory, onClearM
             <div className="w-24 flex justify-end gap-2">
                 <ThemeSelector />
                 <button onClick={onOpenChangelog} className="action-button" aria-label="Open Changelog" title="View Autonomous Evolution Chronicle">
-                    <ChangelogIcon />
+                    <MenuIcon />
                 </button>
             </div>
         </header>

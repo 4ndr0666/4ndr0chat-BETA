@@ -7,6 +7,16 @@ interface ChangelogModalProps {
 
 const changelogData = [
     {
+        version: "V3.0 - UI Apotheosis, Cycle 1",
+        date: "Directive Initiated",
+        changes: [
+            "Initiated complete UI/UX overhaul based on Operator's visual schematic.",
+            "Dismantled responsive side-by-side layout in favor of a persistent top/bottom workspace.",
+            "Re-architected CSS grid and component hierarchy to elevate the cognitive map's prominence.",
+            "Refactored header controls for improved ergonomics and alignment with the new design language.",
+        ]
+    },
+    {
         version: "V2.9 - Autonomous Status Symbology",
         date: "Directive Initiated",
         changes: [

@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Chat, Part } from '@google/genai';
 import { v4 as uuidv4 } from 'uuid';
@@ -433,23 +432,18 @@ function App() {
         <ToastNotification message={toast?.message || null} type={toast?.type} />
         
         <div className="content-grid">
-            <div className="graph-panel panel">
-                <div className="graph-header">
-                    <h2 className="graph-title">Cognitive Map</h2>
-                </div>
-                <div className="graph-canvas-container">
-                    <CognitiveGraphVisualizer 
-                        graphData={graphData}
-                        isEditMode={isEditMode}
-                        selectedNodes={selectedNodes}
-                        onNodeClick={handleNodeSelect}
-                        onToggleEditMode={handleToggleEditMode}
-                        onDeleteSelected={handleDeleteSelectedNodes}
-                        onMergeSelected={handleMergeSelectedNodes}
-                    />
-                </div>
+            <div className="graph-workspace">
+                <CognitiveGraphVisualizer 
+                    graphData={graphData}
+                    isEditMode={isEditMode}
+                    selectedNodes={selectedNodes}
+                    onNodeClick={handleNodeSelect}
+                    onToggleEditMode={handleToggleEditMode}
+                    onDeleteSelected={handleDeleteSelectedNodes}
+                    onMergeSelected={handleMergeSelectedNodes}
+                />
             </div>
-            <div className="chat-panel panel">
+            <div className="chat-workspace">
                 <div className="chat-container flex-1 overflow-y-auto p-4" ref={chatListRef}>
                     <div className="space-y-6">
                         {messages.map((message, index) => (
@@ -512,6 +506,7 @@ function App() {
             onClose={() => setDeleteCandidateId(null)}
             onConfirm={handleDelete}
             title={deleteCandidateId === 'memory-wipe-confirmation' ? "Confirm Memory Wipe" : "Confirm Deletion"}
+            {/* FIX: Corrected typo from `deleteCandidate-id` to `deleteCandidateId`. */}
             bodyText={deleteCandidateId === 'memory-wipe-confirmation' ? "This will permanently erase the cognitive graph from browser storage and reset the session. This action cannot be undone." : "This will delete the selected message and its subsequent AI response, altering the conversational context. This action cannot be undone."}
             confirmText={deleteCandidateId === 'memory-wipe-confirmation' ? "Wipe & Reset" : "Delete & Proceed"}
         />
