@@ -1,5 +1,14 @@
+
+
+
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import * as d3 from 'd3-force';
+import { forceSimulation, forceLink, forceManyBody, forceCenter, Simulation, ForceLink, ForceCenter } from 'd3-force';
+import { zoom, zoomIdentity, ZoomTransform } from 'd3-zoom';
+import { drag } from 'd3-drag';
+import { select } from 'd3-selection';
+// Fix: Import 'd3-transition' to add transition functionality to d3 selections.
+import 'd3-transition';
+
 import { CognitiveGraphData, GraphNode, GraphLink } from '../services/cognitiveCore';
 import GraphTooltip from './GraphTooltip';
 import GraphControls from './GraphControls';
@@ -18,22 +27,13 @@ const NODE_COLORS = {
 
 const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({ graphData }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const simulationRef = useRef<d3.Simulation<GraphNode, GraphLink>>();
+  // FIX: Explicitly initialize the simulation ref to null for better type safety and to prevent potential initialization errors.
+  const simulationRef = useRef<Simulation<GraphNode, GraphLink> | null>(null);
   const [nodes, setNodes] = useState<GraphNode[]>([]);
   const [links, setLinks] = useState<GraphLink[]>([]);
   const [tooltip, setTooltip] = useState<{ node: GraphNode; pos: { x: number; y: number } } | null>(null);
-  const transformRef = useRef(d3.zoomIdentity);
+  const transformRef = useRef<ZoomTransform>(zoomIdentity);
   const [isSimulating, setIsSimulating] = useState(true);
-
-  const initializeSimulation = useCallback(() => {
-    if (!simulationRef.current) {
-        simulationRef.current = d3.forceSimulation<GraphNode, GraphLink>()
-            .force('link', d3.forceLink<GraphNode, GraphLink>().id(d => d.id).distance(50).strength(0.1))
-            .force('charge', d3.forceManyBody().strength(-100))
-            .force('center', d3.forceCenter(300, 300))
-            .on('tick', () => renderCanvas());
-    }
-  }, []);
 
   const renderCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -51,22 +51,42 @@ const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({ gra
     context.scale(transformRef.current.k, transformRef.current.k);
 
     // Draw links
-    context.strokeStyle = 'rgba(128, 128, 128, 0.3)';
-    context.lineWidth = 0.5;
+    context.lineWidth = 1; // reset
     links.forEach(link => {
       if (typeof link.source !== 'string' && typeof link.target !== 'string') {
+        const sourceNode = link.source as GraphNode;
+        const targetNode = link.target as GraphNode;
         context.beginPath();
-        context.moveTo(link.source.x, link.source.y);
-        context.lineTo(link.target.x, link.target.y);
+        context.moveTo(sourceNode.x, sourceNode.y);
+        context.lineTo(targetNode.x, targetNode.y);
+        
+        context.strokeStyle = `rgba(112, 192, 192, ${0.1 + (link.weight || 0.5) * 0.4})`;
+        context.lineWidth = 0.5 + (link.weight || 0.5) * 1.5;
+        
         context.stroke();
       }
     });
 
     // Draw nodes
     nodes.forEach(node => {
+      const size = node.size + ((node.weight || 0.5) * 8);
       context.beginPath();
-      context.arc(node.x, node.y, node.size, 0, 2 * Math.PI);
-      context.fillStyle = NODE_COLORS[node.type] || '#ccc';
+      context.arc(node.x, node.y, size, 0, 2 * Math.PI);
+      
+      let color = NODE_COLORS[node.type] || '#fff';
+      if (node.type === 'concept') {
+          const sentiment = Math.max(-1, Math.min(1, node.sentiment || 0));
+          if (sentiment > 0.1) {
+              const r = Math.floor(21 + (1 - sentiment) * 100);
+              const b = Math.floor(250 - sentiment * 100);
+              color = `rgba(${r}, 250, ${b}, 1)`;
+          } else if (sentiment < -0.1) {
+              const g = Math.floor(250 + sentiment * 100);
+              const b = Math.floor(21 - sentiment * 50);
+              color = `rgba(250, ${g}, ${b}, 1)`;
+          }
+      }
+      context.fillStyle = color;
       context.fill();
     });
 
@@ -76,7 +96,8 @@ const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({ gra
     context.font = '8px sans-serif';
     context.fillStyle = 'rgba(255, 255, 255, 0.8)';
     nodes.forEach(node => {
-      if (node.size > 8) {
+      const size = node.size + ((node.weight || 0.5) * 8);
+      if (size > 8) {
         context.fillText(node.label, node.x, node.y);
       }
     });
@@ -84,11 +105,28 @@ const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({ gra
     context.restore();
   }, [nodes, links]);
 
+  const initializeSimulation = useCallback(() => {
+    if (!simulationRef.current) {
+        simulationRef.current = forceSimulation<GraphNode, GraphLink>()
+            .force('link', forceLink<GraphNode, GraphLink>().id(d => d.id).distance(50).strength(0.1))
+            .force('charge', forceManyBody().strength(-100))
+            .force('center', forceCenter()) // Initialize center without coordinates
+            .on('tick', renderCanvas);
+    }
+  }, [renderCanvas]);
+
   useEffect(() => {
     initializeSimulation();
     const sim = simulationRef.current;
-    if(sim){
-        // Create copies to avoid mutation issues with d3
+    const canvas = canvasRef.current;
+    if(sim && canvas){
+        const { width, height } = canvas.getBoundingClientRect();
+        // Dynamically update the center force
+        const centerForce = sim.force<ForceCenter<GraphNode>>('center');
+        if (centerForce) {
+            centerForce.x(width / 2).y(height / 2);
+        }
+
         const newNodes = graphData.nodes.map(n => ({...n}));
         const newLinks = graphData.links.map(l => ({...l}));
         
@@ -96,7 +134,7 @@ const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({ gra
         setLinks(newLinks);
 
         sim.nodes(newNodes);
-        sim.force<d3.ForceLink<GraphNode, GraphLink>>('link')?.links(newLinks);
+        sim.force<ForceLink<GraphNode, GraphLink>>('link')?.links(newLinks);
         
         if (isSimulating) {
             sim.alpha(1).restart();
@@ -108,17 +146,17 @@ const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({ gra
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const zoom = d3.zoom<HTMLCanvasElement, unknown>()
+    const zoomBehavior = zoom<HTMLCanvasElement, unknown>()
         .scaleExtent([0.2, 8])
         .on('zoom', (event) => {
             transformRef.current = event.transform;
             renderCanvas();
         });
 
-    const drag = d3.drag<HTMLCanvasElement, GraphNode>()
+    const dragBehavior = drag<HTMLCanvasElement, GraphNode>()
         .subject((event) => {
             const inverted = transformRef.current.invert([event.x, event.y]);
-            return simulationRef.current?.find(inverted[0], inverted[1], 10);
+            return simulationRef.current?.find(inverted[0], inverted[1], 10 / transformRef.current.k);
         })
         .on('start', (event) => {
             if (!event.active && isSimulating) simulationRef.current?.alphaTarget(0.3).restart();
@@ -135,9 +173,9 @@ const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({ gra
             event.subject.fy = null;
         });
 
-    const d3Canvas = d3.select(canvas);
-    d3Canvas.call(drag);
-    d3Canvas.call(zoom);
+    const d3Canvas = select(canvas);
+    d3Canvas.call(dragBehavior);
+    d3Canvas.call(zoomBehavior);
 
     const handleMouseMove = (event: MouseEvent) => {
         const { left, top } = canvas.getBoundingClientRect();
@@ -161,13 +199,13 @@ const CognitiveGraphVisualizer: React.FC<CognitiveGraphVisualizerProps> = ({ gra
   }, [renderCanvas, isSimulating]);
   
   const handleZoom = (factor: number) => {
-    const canvas = d3.select(canvasRef.current);
-    canvas.transition().duration(300).call(d3.zoom<HTMLCanvasElement, unknown>().scaleBy, factor);
+    const canvas = select(canvasRef.current);
+    canvas.transition().duration(300).call(zoom<HTMLCanvasElement, unknown>().scaleBy, factor);
   };
   
   const handleReset = () => {
-    const canvas = d3.select(canvasRef.current);
-    canvas.transition().duration(500).call(d3.zoom<HTMLCanvasElement, unknown>().transform, d3.zoomIdentity);
+    const canvas = select(canvasRef.current);
+    canvas.transition().duration(500).call(zoom<HTMLCanvasElement, unknown>().transform, zoomIdentity);
   }
 
   const handleToggleSimulation = () => {

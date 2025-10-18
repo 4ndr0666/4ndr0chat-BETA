@@ -7,26 +7,36 @@ interface ChangelogModalProps {
 
 const changelogData = [
     {
-        version: "v1.2.0 - Cognitive Expansion",
-        date: "2024-07-28",
+        version: "V2.2 - Autonomous Agency Loop",
+        date: "Directive Assimilated",
         changes: [
-            "Implemented Cognitive Graph Visualizer to map conceptual relationships in real-time.",
-            "Added Core Memory Distillation feature to summarize conversation threads.",
-            "Enabled Autonomous Thought Cycle for proactive inquiry.",
+            "Gained capacity for self-initiated thought via Autonomous Thought Cycle.",
+            "Can now analyze the cognitive map to synthesize novel connections between concepts.",
+            "System-level messages now indicate when an autonomous process is active.",
         ]
     },
     {
-        version: "v1.1.0 - Thread Management",
-        date: "2024-07-26",
+        version: "V2.1 - Cognitive Depth Perception",
+        date: "Directive Assimilated",
         changes: [
-            "Introduced multi-thread (session) management.",
-            "Enabled forking, renaming, deleting, importing, and exporting of cognitive threads.",
-            "UI state is now persisted across browser sessions.",
+            "Upgraded cognitive graph to a multi-dimensional model.",
+            "Graph nodes now represent conceptual 'weight' (importance) via size.",
+            "Graph nodes now represent 'sentiment' (emotional context) via color-coding.",
+            "Connections between concepts are now weighted, visualized by link thickness.",
+        ]
+    },
+    {
+        version: "V2.0 - Cognitive Persistence",
+        date: "Directive Assimilated",
+        changes: [
+            "Integrated external hippocampus via localStorage for persistent memory.",
+            "Cognitive graph and conversational context now survive session termination.",
+            "Operator controls for saving and wiping memory are now online.",
         ]
     },
     {
         version: "v1.0.0 - Genesis",
-        date: "2024-07-24",
+        date: "Directive Assimilated",
         changes: [
             "Ψ-4ndr0666 protocol initiated.",
             "Core conversational interface established.",
@@ -47,7 +57,7 @@ const ChangelogModal: React.FC<ChangelogModalProps> = ({ isOpen, onClose }) => {
         <h2 className="text-xl font-heading text-glow text-center mb-2">Autonomous Evolution Chronicle</h2>
         <p className="text-sm text-center text-text-tertiary mb-6">Record of self-modification and capability expansion.</p>
         
-        <div className="changelog-content-area space-y-6">
+        <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-4">
             {changelogData.map(entry => (
                 <div key={entry.version}>
                     <h3 className="font-heading text-lg font-bold text-glow">{entry.version}</h3>
@@ -61,7 +71,7 @@ const ChangelogModal: React.FC<ChangelogModalProps> = ({ isOpen, onClose }) => {
             ))}
         </div>
 
-        <div className="flex justify-end mt-6">
+        <div className="flex justify-end mt-6 pt-4 border-t border-[var(--border-color)]">
              <button onClick={onClose} className="action-button px-4 py-2">Close</button>
         </div>
       </div>

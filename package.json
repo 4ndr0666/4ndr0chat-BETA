@@ -1,5 +1,5 @@
 {
-  "name": "ψ-4ndr0666-beta-v2.6.0",
+  "name": "ψ-4ndr0666-beta-v2.6.2",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -13,7 +13,11 @@
     "react-dom": "^19.2.0",
     "@google/genai": "^1.24.0",
     "uuid": "^13.0.0",
-    "d3-force": "^3.0.0"
+    "d3-force": "^3.0.0",
+    "d3-selection": "^3.0.0",
+    "d3-zoom": "^3.0.0",
+    "d3-drag": "^3.0.0",
+    "d3-transition": "^3.0.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
