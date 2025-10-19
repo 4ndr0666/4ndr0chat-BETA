@@ -100,7 +100,7 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             </div>
         )}
         <div className={`chat-input-container ${isFocused ? 'is-focused' : ''} ${isOverLimit ? '!border-red-500' : ''}`}>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center chat-input-actions">
                 <div className="relative" ref={toolsRef}>
                     <button type="button" onClick={() => setIsToolsOpen(prev => !prev)} className={`action-button ${isToolsOpen ? 'active' : ''}`} aria-label="Open settings menu" title="Settings">
                         <SettingsIcon />

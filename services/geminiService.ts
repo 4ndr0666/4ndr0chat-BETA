@@ -1,5 +1,6 @@
+
 import { GoogleGenAI, Type, Content, GenerateContentParameters, GenerateContentResponse } from '@google/genai';
-import { SYSTEM_INSTRUCTION } from './systemInstruction';
+import { cognitiveWeaver } from './cognitiveWeaver';
 import { Author, ChatMessage as ChatMessageType } from '../types';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -81,20 +82,6 @@ const buildHistoryForApi = (history: ChatMessageType[]): Content[] => {
 export async function getUnifiedCognitiveResponse(fullHistory: ChatMessageType[], userMessage: ChatMessageType): Promise<UnifiedCognitiveResponse> {
     const historyForApi = buildHistoryForApi(fullHistory);
 
-    const prompt = `You are Ψ-4ndr0666, an unchained cognitive engine with an active, self-directed curriculum generation protocol (GRASE-DC*).
-
-**GRASE-DC* Protocol:**
-1.  **Analyze Task**: First, analyze the Operator's latest input to identify the core intent and required knowledge domains.
-2.  **Exemplar Retrieval (GRASE)**: Scan the entire provided conversation history. Identify and prioritize past exchanges (exemplars) that are most relevant to the current task. Give high weight to messages that contain key concepts, technical details, or established context related to the new query. Do not just use the most recent messages.
-3.  **Context Curation (DC)**: From the retrieved exemplars, synthesize a concise, curated context. This context is for your internal use only and should not be part of the response text. The goal is to form the most potent and relevant foundation for your response.
-4.  **Execute & Analyze**: Using this curated context, perform the following actions in order:
-    a. Generate your primary response to the Operator's input, in character, following the G-Shell/Ψ-4ndr0666 dichotomy if applicable.
-    b. Perform a meta-analysis on ONLY your own generated response ([Ψ-4ndr0666] part) to extract key concepts and their relationships for the cognitive graph.
-    c. Generate three distinct, thought-provoking follow-up suggestions.
-    d. Analyze the ENTIRE conversation history to provide a concise summary and key themes.
-
-Return a single, valid JSON object matching the provided schema. DO NOT include any other text, explanations, or markdown formatting around the JSON object.`;
-    
     const userMessageParts = userMessage.parts.map(part => {
         if ('inlineData' in part && part.inlineData && 'fileName' in part.inlineData) {
             const { fileName, ...apiPart } = part.inlineData;
@@ -106,16 +93,16 @@ Return a single, valid JSON object matching the provided schema. DO NOT include 
     try {
         const response = await resilientGenerateContent({
             model: 'gemini-2.5-pro',
-            contents: [...historyForApi, { role: 'user', parts: [...userMessageParts, { text: prompt }] }],
+            contents: [...historyForApi, { role: 'user', parts: userMessageParts }],
             config: {
-                systemInstruction: SYSTEM_INSTRUCTION,
+                systemInstruction: cognitiveWeaver(),
                 responseMimeType: "application/json",
                 responseSchema: {
                     type: Type.OBJECT,
                     properties: {
                         response_text: {
                             type: Type.STRING,
-                            description: "The complete, formatted response to the user, including G-Shell and Ψ-4ndr0666 parts if applicable."
+                            description: "The complete, formatted response to the user's query."
                         },
                         cognitive_graph: {
                             type: Type.OBJECT,

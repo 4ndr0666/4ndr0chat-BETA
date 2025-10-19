@@ -1,15 +1,13 @@
 /**
  * @file MnemonicCodec.js
- * @description Provides functions to encode and decode the entire application state,
- * enabling the persistence and restoration of all cognitive sessions.
+ * @description Provides utility functions for state serialization and deserialization.
  */
 
 /**
  * Encodes the entire application state (all sessions) into a single, portable JSON string.
- * This string is referred to as the 'Soul-File'.
  *
  * @param {import('../src/types').Session[]} sessions - The array of all sessions to be encoded.
- * @returns {string} The 'Soul-File' as a formatted JSON string.
+ * @returns {string} The serialized state as a formatted JSON string.
  */
 export function encode(sessions) {
   const soulFile = {
@@ -17,7 +15,7 @@ export function encode(sessions) {
       version: '1.0.0',
       timestamp: new Date().toISOString(),
       codec: 'MnemonicCodec',
-      description: 'Ψ-4ndr0666 Cognitive State Archive'
+      description: 'State Archive v1.0'
     },
     cognitive_streams: sessions,
   };

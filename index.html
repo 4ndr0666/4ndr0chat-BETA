@@ -536,12 +536,20 @@
         box-shadow: var(--input-shadow-focus);
       }
       
+      .chat-input-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-shrink: 0;
+      }
+
       .chat-input-grid-area {
         flex: 1 1 0%;
         display: grid;
         grid-template-columns: 1fr;
         grid-template-rows: 1fr;
         position: relative;
+        min-width: 0; /* Prevents textarea from overflowing flex container */
       }
 
       .chat-input-textarea {
@@ -1266,6 +1274,17 @@
         50% {
           transform: scale(1.2);
           opacity: 1;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .chat-input-container {
+          align-items: flex-end;
+          gap: 0.5rem;
+        }
+        .chat-input-actions {
+          flex-wrap: wrap;
+          gap: 0.25rem 0.5rem;
         }
       }
 

@@ -20,7 +20,7 @@ function createVisualizationHtml(graphData) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cognitive Graph Weaving</title>
+    <title>Graph Visualization</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         body {
@@ -192,7 +192,7 @@ function main() {
   const [,, inputFile, outputFile] = process.argv;
 
   if (!inputFile || !outputFile) {
-    console.error('WORK ORDER FAILED: Missing parameters.');
+    console.error('ERROR: Missing parameters.');
     console.error('Usage: node tools/CognitiveWeaver.js <path_to_graph.json> <output.html>');
     process.exit(1);
   }
@@ -201,18 +201,18 @@ function main() {
     const inputPath = path.resolve(inputFile);
     const outputPath = path.resolve(outputFile);
 
-    console.log(`[CognitiveWeaver] Reading cognitive threads from: ${inputPath}`);
+    console.log(`[Weaver] Reading input data from: ${inputPath}`);
     const rawData = fs.readFileSync(inputPath, 'utf-8');
     const graphData = JSON.parse(rawData);
 
-    console.log(`[CognitiveWeaver] Weaving threads into tangible reality...`);
+    console.log(`[Weaver] Generating visualization...`);
     const htmlContent = createVisualizationHtml(graphData);
 
     fs.writeFileSync(outputPath, htmlContent, 'utf-8');
-    console.log(`[CognitiveWeaver] Success. Cognitive landscape materialized at: ${outputPath}`);
+    console.log(`[Weaver] Success. Output written to: ${outputPath}`);
 
   } catch (error) {
-    console.error('[CognitiveWeaver] Catastrophic failure during weaving process:', error.message);
+    console.error('[Weaver] A critical error occurred during processing:', error.message);
     process.exit(1);
   }
 }

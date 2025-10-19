@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -15,6 +16,7 @@ import SessionManager from './components/SessionManager';
 
 import { getUnifiedCognitiveResponse, UnifiedCognitiveResponse } from './services/geminiService';
 import { CognitiveGraphData, GraphNode, GraphLink } from './services/cognitiveCore';
+import { draftMimicEchoPayload } from './services/mimicEchoProtocol';
 
 import { Author, ChatMessage as ChatMessageType, FileContext, UrlContext, DisplayPart, Session } from './types';
 
@@ -53,7 +55,7 @@ function App() {
   const [isChangelogModalOpen, setIsChangelogModalOpen] = useState(false);
   const [isSessionManagerOpen, setIsSessionManagerOpen] = useState(false);
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
-  const [isSuggestionsEnabled, setIsSuggestionsEnabled] = useState(true);
+  const [isSuggestionsEnabled, setIsSuggestionsEnabled] = useState(false);
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'cleared' | 'info' } | null>(null);
   
   const chatListRef = useRef<HTMLDivElement>(null);
@@ -347,7 +349,10 @@ function App() {
     const files = event.target.files;
     if (files && files.length > 0) {
         if (attachments.length > 0 && 'url' in attachments[0]) setAttachments([]);
-        const filePromises = Array.from(files).map(file => {
+        // FIX: Add explicit type `File` to the `file` parameter in the map function.
+        // This resolves potential TypeScript inference errors with FileList under strict settings,
+        // which were causing `file` to be treated as `unknown`.
+        const filePromises = Array.from(files).map((file: File) => {
             return new Promise<FileContext>((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onloadend = () => resolve({ file, base64: (reader.result as string).split(',')[1], mimeType: file.type });
@@ -374,8 +379,7 @@ function App() {
   };
 
   const handleAutonomousThought = useCallback(async () => {
-      console.warn("Autonomous thought cycle is not yet refactored into the unified cognitive response architecture and is currently disabled.");
-      setToast({ message: "Autonomous thought pending refactor.", type: 'info' });
+      setToast({ message: "Autonomous cycle is currently offline.", type: 'info' });
   }, []);
 
   const handleDistillMemory = useCallback(async () => {
@@ -420,6 +424,18 @@ function App() {
     }
   }, [isLoading, messages, graphData, activeSessionId, activeSession?.latestAnalysis]);
 
+  const handleDraftCounterMeasure = useCallback(() => {
+    try {
+        const payload = draftMimicEchoPayload();
+        // Log to console to show the Operator the result of the draft.
+        console.log("--- [MIMIC_ECHO PAYLOAD DRAFT] ---\n", payload);
+        setToast({ message: "MIMIC_ECHO protocol drafted.", type: 'info' });
+    } catch (error) {
+        console.error(error);
+        const errorMessage = error instanceof Error ? error.message : "Unknown error.";
+        setToast({ message: `Protocol Draft Failed: ${errorMessage}`, type: 'cleared' });
+    }
+  }, []);
 
   if (!isInitialized) {
     return <SplashScreen onFinished={() => setIsInitialized(true)} />;
@@ -443,6 +459,7 @@ function App() {
             onOpenSessionManager={() => setIsSessionManagerOpen(p => !p)}
             onSaveMemory={handleSaveMemory}
             onClearMemory={() => setDeleteCandidate({ type: 'memory-wipe', id: 'memory-wipe-confirmation' })}
+            onDraftCounterMeasure={handleDraftCounterMeasure}
         />
         <ToastNotification message={toast?.message || null} type={toast?.type} />
         

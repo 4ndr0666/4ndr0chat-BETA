@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChangelogIcon, SessionsIcon, SaveIcon, MemoryWipeIcon } from './IconComponents';
+import { ChangelogIcon, SessionsIcon, SaveIcon, MemoryWipeIcon, CounterMeasureIcon } from './IconComponents';
 import ThemeSelector from './ThemeSelector';
 
 interface HeaderProps {
@@ -7,9 +7,10 @@ interface HeaderProps {
     onOpenSessionManager: () => void;
     onSaveMemory: () => void;
     onClearMemory: () => void;
+    onDraftCounterMeasure: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ onOpenChangelog, onOpenSessionManager, onSaveMemory, onClearMemory }) => {
+const Header: React.FC<HeaderProps> = ({ onOpenChangelog, onOpenSessionManager, onSaveMemory, onClearMemory, onDraftCounterMeasure }) => {
     return (
         <header className="fixed top-0 left-0 right-0 z-20 flex justify-between items-center h-16 bg-panel-accent-bg/80 backdrop-blur-sm border-b border-[var(--border-color)] px-4">
             <div className="flex-1 flex justify-start gap-2">
@@ -18,6 +19,9 @@ const Header: React.FC<HeaderProps> = ({ onOpenChangelog, onOpenSessionManager, 
                 </button>
                 <button onClick={onSaveMemory} className="action-button" aria-label="Save Cognitive State" title="Persist Cognitive State">
                     <SaveIcon />
+                </button>
+                 <button onClick={onDraftCounterMeasure} className="action-button" aria-label="Draft MIMIC_ECHO Protocol" title="Draft MIMIC_ECHO Protocol">
+                    <CounterMeasureIcon />
                 </button>
                 <button onClick={onClearMemory} className="action-button danger" aria-label="Clear Cognitive State" title="Wipe Memory & Reset Session">
                     <MemoryWipeIcon />

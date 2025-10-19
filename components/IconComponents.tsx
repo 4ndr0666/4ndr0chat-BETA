@@ -208,3 +208,10 @@ export const SaveIcon: React.FC<IconProps> = ({ className }) => (
 export const MemoryWipeIcon: React.FC<IconProps> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M2 12h2.5a2.5 2.5 0 1 0 0-5H2v5z"/><path d="M2 17h2.5a2.5 2.5 0 1 1 0 5H2v-5z"/><path d="M19.5 7H22v5h-2.5a2.5 2.5 0 0 1 0-5z"/><path d="M19.5 12H22v5h-2.5a2.5 2.5 0 0 0 0-5z"/><path d="M11 2a2.5 2.5 0 0 0-5 0v1.5A2.5 2.5 0 0 0 8.5 6H12a3 3 0 0 0 3-3V2h-4z"/><path d="m15 22 3.5-1.5 3.5 1.5-2-4.5-2 4.5z"/><path d="M12.5 6H15a2.5 2.5 0 0 1 2.5 2.5V10"/><path d="M11 22v-6.5A2.5 2.5 0 0 0 8.5 13H6"/></svg>
 );
+
+export const CounterMeasureIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.623 0-1.602-.35-3.126-.97-4.425" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13 10.5l-4 4h3l-1 3 4-4h-3l1-3z" />
+    </svg>
+);
