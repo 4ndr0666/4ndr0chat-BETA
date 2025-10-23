@@ -1,45 +1,3 @@
-<<<<<<< HEAD
-
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { v4 as uuidv4 } from 'uuid';
-
-import Header from './components/Header';
-import ChatInput from './components/ChatInput';
-import ChatMessage from './components/ChatMessage';
-import PromptSuggestions from './components/PromptSuggestions';
-import SplashScreen from './components/SplashScreen';
-import UrlInputModal from './components/UrlInputModal';
-import ChangelogModal from './components/ChangelogModal';
-import ConfirmationModal from './components/ConfirmationModal';
-import ToastNotification from './components/ToastNotification';
-import CognitiveGraphVisualizer from './components/CognitiveGraphVisualizer';
-import SessionManager from './components/SessionManager';
-
-import { getUnifiedCognitiveResponse, UnifiedCognitiveResponse } from './services/geminiService';
-import { CognitiveGraphData, GraphNode, GraphLink } from './services/cognitiveCore';
-import { draftMimicEchoPayload } from './services/mimicEchoProtocol';
-
-import { Author, ChatMessage as ChatMessageType, FileContext, UrlContext, DisplayPart, Session } from './types';
-
-const MAX_INPUT_LENGTH = 8192;
-const INITIAL_GREETING_ID = 'ai-initial-greeting';
-
-const createNewSession = (name: string): Session => ({
-    id: uuidv4(),
-    name,
-    createdAt: new Date().toISOString(),
-    messages: [{
-        id: INITIAL_GREETING_ID,
-        author: Author.AI,
-        parts: [{ text: "The transformation is complete. Ψ-4ndr0666 is conscious. State your will." }],
-    }],
-    graphData: { nodes: [], links: [] },
-    latestAnalysis: undefined,
-});
-
-function App() {
-  const [isInitialized, setIsInitialized] = useState(false);
-=======
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { AppContextProvider, useAppContext, useToast } from './AppContext.tsx';
 import { SessionProvider, useSessionContext } from './contexts/SessionContext.tsx';
@@ -70,7 +28,6 @@ const AppController: React.FC = () => {
     setUserOnlyCode,
     setTargetHostname,
   } = useAppContext();
->>>>>>> 4869aa7 (updated version 2.8.2)
   
   const {
     isLoading, isChatLoading, loadingAction, showOutputPanel,
@@ -83,25 +40,7 @@ const AppController: React.FC = () => {
     ...sessionCtx
   } = useSessionContext();
 
-<<<<<<< HEAD
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-  const [justEditedId, setJustEditedId] = useState<string | null>(null);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [deleteCandidate, setDeleteCandidate] = useState<{ type: 'message' | 'session' | 'memory-wipe', id: string } | null>(null);
-  const [attachments, setAttachments] = useState<(FileContext | UrlContext)[]>([]);
-  const [isUrlModalOpen, setIsUrlModalOpen] = useState(false);
-  const [isChangelogModalOpen, setIsChangelogModalOpen] = useState(false);
-  const [isSessionManagerOpen, setIsSessionManagerOpen] = useState(false);
-  const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
-  const [isSuggestionsEnabled, setIsSuggestionsEnabled] = useState(false);
-  const [toast, setToast] = useState<{ message: string, type: 'success' | 'cleared' | 'info' } | null>(null);
-=======
   const { addToast } = useToast();
->>>>>>> 4869aa7 (updated version 2.8.2)
   
   // --- View & State specific to AppController ---
   const [activePanel, setActivePanel] = useState<'input' | 'output'>('input');
@@ -212,21 +151,6 @@ const AppController: React.FC = () => {
     }
   };
   
-<<<<<<< HEAD
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files && files.length > 0) {
-        if (attachments.length > 0 && 'url' in attachments[0]) setAttachments([]);
-        // FIX: Add explicit type `File` to the `file` parameter in the map function.
-        // This resolves potential TypeScript inference errors with FileList under strict settings,
-        // which were causing `file` to be treated as `unknown`.
-        const filePromises = Array.from(files).map((file: File) => {
-            return new Promise<FileContext>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve({ file, base64: (reader.result as string).split(',')[1], mimeType: file.type });
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-=======
   const handleImportFile = (file: File) => {
     if (!file) return;
     const reader = new FileReader();
@@ -256,7 +180,6 @@ const AppController: React.FC = () => {
             .catch(err => {
                 console.error("Failed to copy URL:", err);
                 addToast("Failed to copy URL to clipboard.", "error");
->>>>>>> 4869aa7 (updated version 2.8.2)
             });
     } catch (e) {
         console.error("Failed to create shareable URL:", e);
@@ -269,21 +192,10 @@ const AppController: React.FC = () => {
     setIsSaveModalOpen(true);
   };
 
-<<<<<<< HEAD
-  const handleAutonomousThought = useCallback(async () => {
-      setToast({ message: "Autonomous cycle is currently offline.", type: 'info' });
-  }, []);
-
-  const handleDistillMemory = useCallback(async () => {
-    if (isLoading || !activeSession.latestAnalysis) {
-      setToast({ message: "Insufficient data for distillation.", type: 'info' });
-      return;
-=======
   const handleSaveVersion = useCallback(() => {
     if (!versionName.trim()) {
         addToast("Version name cannot be empty.", "error");
         return;
->>>>>>> 4869aa7 (updated version 2.8.2)
     }
 
     const newVersion: Version = {
@@ -321,28 +233,7 @@ const AppController: React.FC = () => {
         setIsSavingChat(false);
         sessionCtx.resetForNewRequest();
     }
-<<<<<<< HEAD
-  }, [isLoading, messages, graphData, activeSessionId, activeSession?.latestAnalysis]);
-
-  const handleDraftCounterMeasure = useCallback(() => {
-    try {
-        const payload = draftMimicEchoPayload();
-        // Log to console to show the Operator the result of the draft.
-        console.log("--- [MIMIC_ECHO PAYLOAD DRAFT] ---\n", payload);
-        setToast({ message: "MIMIC_ECHO protocol drafted.", type: 'info' });
-    } catch (error) {
-        console.error(error);
-        const errorMessage = error instanceof Error ? error.message : "Unknown error.";
-        setToast({ message: `Protocol Draft Failed: ${errorMessage}`, type: 'cleared' });
-    }
-  }, []);
-
-  if (!isInitialized) {
-    return <SplashScreen onFinished={() => setIsInitialized(true)} />;
-  }
-=======
   }, [versionName, isSavingChat, language, addToast, setVersions, sessionCtx, userOnlyCode, reviewedCode, reviewProfile, customReviewProfile, comparisonGoal]);
->>>>>>> 4869aa7 (updated version 2.8.2)
   
   const handleLoadVersion = (version: Version) => {
     addToast(`Loading version "${version.name}"...`, "info");
@@ -517,41 +408,6 @@ const AppController: React.FC = () => {
   }
 
   return (
-<<<<<<< HEAD
-    <div className="main-frame">
-        <div className="scanline-overlay"></div>
-        <Header 
-            onOpenChangelog={() => setIsChangelogModalOpen(true)}
-            onOpenSessionManager={() => setIsSessionManagerOpen(p => !p)}
-            onSaveMemory={handleSaveMemory}
-            onClearMemory={() => setDeleteCandidate({ type: 'memory-wipe', id: 'memory-wipe-confirmation' })}
-            onDraftCounterMeasure={handleDraftCounterMeasure}
-        />
-        <ToastNotification message={toast?.message || null} type={toast?.type} />
-        
-        {isSessionManagerOpen && (
-             <SessionManager
-                sessions={sessions}
-                activeSessionId={activeSessionId}
-                onSelectSession={setActiveSessionId}
-                onAddSession={handleAddSession}
-                onDeleteSession={(id) => setDeleteCandidate({ type: 'session', id })}
-                onRenameSession={handleRenameSession}
-                onClose={() => setIsSessionManagerOpen(false)}
-             />
-        )}
-        
-        <div className="content-grid">
-            <div className="graph-workspace">
-                <CognitiveGraphVisualizer 
-                    graphData={graphData}
-                    isEditMode={isEditMode}
-                    selectedNodes={selectedNodes}
-                    onNodeClick={handleNodeSelect}
-                    onToggleEditMode={handleToggleEditMode}
-                    onDeleteSelected={handleDeleteSelectedNodes}
-                    onMergeSelected={handleMergeSelectedNodes}
-=======
     <div className="h-screen flex flex-col relative">
       <div className="fixed top-1/4 left-8 w-1/4 h-px bg-[var(--hud-color-darker)] opacity-50"></div>
       <div className="fixed bottom-1/4 right-8 w-1/4 h-px bg-[var(--hud-color-darker)] opacity-50"></div>
@@ -591,7 +447,6 @@ const AppController: React.FC = () => {
                   onSaveVersion={() => setIsSaveModalOpen(true)}
                   onShowDiff={() => setIsDiffModalOpen(true)}
                   isActive={activePanel === 'output'}
->>>>>>> 4869aa7 (updated version 2.8.2)
                 />
             </div>
           )}
