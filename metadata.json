@@ -1,5 +1,12 @@
 {
+<<<<<<< HEAD
   "name": "Ψ-4ndr0666-DCP-v2.0.3",
   "description": "Autonomous cognitive engine with persistent memory, multi-dimensional understanding, and self-reflection capabilities.",
   "requestFramePermissions": []
+=======
+  "name": "4ndr0debugv2.8.3",
+  "description": "Feat - Covert Function Name Audit\n\nMitigated blatant names.",
+  "requestFramePermissions": [],
+  "prompt": ""
+>>>>>>> 4869aa7 (updated version 2.8.2)
 }

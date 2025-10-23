@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
@@ -38,10 +39,51 @@ const createNewSession = (name: string): Session => ({
 
 function App() {
   const [isInitialized, setIsInitialized] = useState(false);
-  
-  const [sessions, setSessions] = useState<Session[]>([createNewSession('Primary Cognitive Stream')]);
-  const [activeSessionId, setActiveSessionId] = useState<string>(sessions[0].id);
+=======
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { AppContextProvider, useAppContext, useToast } from './AppContext.tsx';
+import { SessionProvider, useSessionContext } from './contexts/SessionContext.tsx';
+import { Header } from './Components/Header.tsx';
+import { CodeInput } from './Components/CodeInput.tsx';
+import { ReviewOutput } from './Components/ReviewOutput.tsx';
+import { SupportedLanguage, Version, ReviewProfile, AppMode, ImportedSession, ProjectFile } from './types.ts';
+import { DiffViewer } from './Components/DiffViewer.tsx';
+import { ComparisonInput } from './Components/ComparisonInput.tsx';
+import { VersionHistoryModal } from './Components/VersionHistoryModal.tsx';
+import { SaveVersionModal } from './Components/SaveVersionModal.tsx';
+import { ApiKeyBanner } from './Components/ApiKeyBanner.tsx';
+import { DocumentationCenterModal } from './Components/DocumentationCenterModal.tsx';
+import { ProjectFilesModal } from './Components/ProjectFilesModal.tsx';
+import { AuditInput } from './Components/AuditInput.tsx';
+import { SessionManagerModal } from './Components/SessionManagerModal.tsx';
+import { AdversarialReportGenerator } from './Components/AdversarialReportGenerator.tsx';
+import { SegmentedControl } from './Components/SegmentedControl.tsx';
+import { LiveReconModal } from './Components/LiveReconModal.tsx';
+import { ExploitStagerModal } from './Components/ExploitStagerModal.tsx';
+import { ThreatVectorModal } from './Components/ThreatVectorModal.tsx';
 
+const AppController: React.FC = () => {
+  const { 
+    appMode, language, reviewProfile, customReviewProfile, userOnlyCode, codeB, errorMessage, comparisonGoal, versions, projectFiles, targetHostname,
+    setLanguage, setProjectFiles, setVersions,
+    setImportedSessions, resetAndSetMode,
+    setUserOnlyCode,
+    setTargetHostname,
+  } = useAppContext();
+>>>>>>> 4869aa7 (updated version 2.8.2)
+  
+  const {
+    isLoading, isChatLoading, loadingAction, showOutputPanel,
+    isInputPanelVisible, setIsInputPanelVisible, isChatMode,
+    handleStopGenerating, handleReviewSubmit, handleAuditSubmit,
+    handleCompareAndOptimize, handleCompareAndRevise, reviewedCode,
+    revisedCode, handleLoadRevisionIntoEditor,
+    handleStartFollowUp, handleGenerateTests, handleGenerateAdversarialReport,
+    handleLoadSession,
+    ...sessionCtx
+  } = useSessionContext();
+
+<<<<<<< HEAD
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
   const [input, setInput] = useState('');
@@ -57,294 +99,120 @@ function App() {
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
   const [isSuggestionsEnabled, setIsSuggestionsEnabled] = useState(false);
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'cleared' | 'info' } | null>(null);
+=======
+  const { addToast } = useToast();
+>>>>>>> 4869aa7 (updated version 2.8.2)
   
-  const chatListRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-  
-  const activeSession = sessions.find(s => s.id === activeSessionId) || sessions[0];
-  const messages = activeSession.messages;
-  const graphData = activeSession.graphData;
-  
-  const updateSession = (sessionId: string, updates: Partial<Session>) => {
-    setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, ...updates } : s));
-  };
+  // --- View & State specific to AppController ---
+  const [activePanel, setActivePanel] = useState<'input' | 'output'>('input');
+
+  // --- Modal State ---
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [isDiffModalOpen, setIsDiffModalOpen] = useState(false);
+  const [isVersionHistoryModalOpen, setIsVersionHistoryModalOpen] = useState(false);
+  const [isDocsModalOpen, setIsDocsModalOpen] = useState(false);
+  const [isProjectFilesModalOpen, setIsProjectFilesModalOpen] = useState(false);
+  const [isSessionManagerModalOpen, setIsSessionManagerModalOpen] = useState(false);
+  const [isReportGeneratorModalOpen, setIsReportGeneratorModalOpen] = useState(false);
+  const [isReconModalOpen, setIsReconModalOpen] = useState(false);
+  const [isExploitStagerModalOpen, setIsExploitStagerModalOpen] = useState(false);
+  const [isThreatVectorModalOpen, setIsThreatVectorModalOpen] = useState(false);
+  const [versionName, setVersionName] = useState('');
+  const [isSavingChat, setIsSavingChat] = useState(false);
+  const [isGeneratingName, setIsGeneratingName] = useState<boolean>(false);
+  const [initialAdversarialContext, setInitialAdversarialContext] = useState<string | null>(null);
+  const [initialExploitEndpoint, setInitialExploitEndpoint] = useState<string>('');
+
+
+  const attachFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const savedSessions = localStorage.getItem('psi-cognitive-sessions');
-    const lastActiveId = localStorage.getItem('psi-last-active-session');
-    if (savedSessions) {
+    const hash = window.location.hash.slice(1);
+    if (hash) {
         try {
-            const parsedSessions = JSON.parse(savedSessions);
-            if (Array.isArray(parsedSessions) && parsedSessions.length > 0) {
-                setSessions(parsedSessions);
-                setActiveSessionId(lastActiveId || parsedSessions[0].id);
-            }
+            const decodedState = JSON.parse(atob(hash));
+            // Only load "config" state from URL, not session state
+            if (decodedState.appMode) resetAndSetMode(decodedState.appMode);
+            if (decodedState.language) setLanguage(decodedState.language);
+            if (decodedState.userOnlyCode) setUserOnlyCode(decodedState.userOnlyCode);
+            // ... load other config props from useAppContext
+            window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            addToast("Session loaded from URL", "info");
         } catch (e) {
-            console.error('[MEMORY_ERROR]: Failed to parse saved sessions.', e);
-            setSessions([createNewSession('Primary Cognitive Stream')]);
-            setActiveSessionId(sessions[0].id);
+            console.error("Failed to load state from URL hash:", e);
+            addToast("Failed to load session from URL", "error");
         }
     }
   }, []);
 
-  useEffect(() => {
-    if (!isInitialized) return;
+  const handleExportSession = () => {
     try {
-        localStorage.setItem('psi-cognitive-sessions', JSON.stringify(sessions));
-        localStorage.setItem('psi-last-active-session', activeSessionId);
-    } catch (e) {
-        console.error('[MEMORY_ERROR]: Failed to save sessions.', e);
-        setToast({ message: "Failed to persist state.", type: 'cleared' });
+        const sessionState = {
+            version: "2.0.0", // New version for refactored state
+            // Global Config State
+            appMode, language, reviewProfile, 
+            customReviewProfile,
+            userOnlyCode, codeB, 
+            errorMessage, 
+            comparisonGoal,
+            versions, 
+            projectFiles,
+            targetHostname,
+            
+            // Operational Session State
+            reviewFeedback: sessionCtx.reviewFeedback, revisedCode: revisedCode,
+            reviewedCode: reviewedCode, chatHistory: sessionCtx.chatHistory, 
+            chatRevisions: sessionCtx.chatRevisions, chatFiles: sessionCtx.chatFiles,
+            featureMatrix: sessionCtx.featureMatrix, rawFeatureMatrixJson: sessionCtx.rawFeatureMatrixJson, 
+            featureDecisions: sessionCtx.featureDecisions,
+            finalizationSummary: sessionCtx.finalizationSummary, finalizationBriefing: sessionCtx.finalizationBriefing,
+            contextFileIds: Array.from(sessionCtx.contextFileIds),
+        };
+        const blob = new Blob([JSON.stringify(sessionState, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `4ndr0debug_session_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        addToast("Session exported successfully!", "success");
+    } catch (err) {
+        console.error("Failed to export session:", err);
+        addToast("Failed to export session.", "error");
     }
-  }, [sessions, activeSessionId, isInitialized]);
+  };
 
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
-  
-  useEffect(() => {
-    if (isAutoScrollEnabled && chatListRef.current) {
-      chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
-    }
-  }, [messages, isAutoScrollEnabled]);
-
-  const handleDeleteMessage = useCallback((messageId: string) => {
-    const messageIndex = messages.findIndex(m => m.id === messageId);
-    if (messageIndex === -1) return;
-
-    let newMessages;
-    if (messages[messageIndex].author === Author.USER && 
-        messageIndex + 1 < messages.length && 
-        messages[messageIndex + 1].author === Author.AI) {
-        newMessages = messages.slice(0, messageIndex).concat(messages.slice(messageIndex + 2));
-    } else {
-        newMessages = messages.filter(m => m.id !== messageId);
-    }
-    updateSession(activeSessionId, { messages: newMessages });
-  }, [messages, activeSessionId]);
-
-  const handleSaveMemory = useCallback(() => {
+  const processImportedSessionFile = (fileContent: string, fileName: string) => {
     try {
-        localStorage.setItem('psi-cognitive-sessions', JSON.stringify(sessions));
-        localStorage.setItem('psi-last-active-session', activeSessionId);
-        setToast({ message: "Cognitive state saved.", type: 'success' });
-    } catch (e) {
-        console.error('[MEMORY_ERROR]: Failed to save cognitive state.', e);
-        setToast({ message: "Failed to save state.", type: 'cleared' });
-    }
-  }, [sessions, activeSessionId]);
+        const importedState = JSON.parse(fileContent);
+        if (typeof importedState.appMode !== 'string' || typeof importedState.language !== 'string') {
+            throw new Error("Invalid session file format.");
+        }
 
-  const handleClearMemory = () => {
-    const newSession = createNewSession('Primary Cognitive Stream');
-    setSessions([newSession]);
-    setActiveSessionId(newSession.id);
-    setToast({ message: "All sessions wiped.", type: 'cleared' });
-  };
-
-  const handleDelete = () => {
-    if (!deleteCandidate) return;
-    switch (deleteCandidate.type) {
-        case 'memory-wipe': handleClearMemory(); break;
-        case 'session':
-            if (sessions.length > 1) {
-                const newSessions = sessions.filter(s => s.id !== deleteCandidate.id);
-                setSessions(newSessions);
-                if (activeSessionId === deleteCandidate.id) setActiveSessionId(newSessions[0].id);
-                setToast({ message: "Session deleted.", type: 'cleared' });
-            }
-            break;
-        case 'message': handleDeleteMessage(deleteCandidate.id); break;
-    }
-    setDeleteCandidate(null);
-  };
-  
-  const handleAddSession = () => {
-    const newSession = createNewSession(`Stream ${sessions.length + 1}`);
-    setSessions(prev => [...prev, newSession]);
-    setActiveSessionId(newSession.id);
-    setIsSessionManagerOpen(false);
-    setToast({ message: "New cognitive stream initiated.", type: 'info' });
-  };
-
-  const handleRenameSession = (id: string, newName: string) => {
-    setSessions(prev => prev.map(s => s.id === id ? { ...s, name: newName } : s));
-  };
-
-  const handleToggleEditMode = useCallback(() => setIsEditMode(prev => !prev), []);
-
-  const handleNodeSelect = useCallback((nodeId: string) => {
-    setSelectedNodes(prev => {
-        const newSelection = new Set(prev);
-        if (newSelection.has(nodeId)) newSelection.delete(nodeId); else newSelection.add(nodeId);
-        return newSelection;
-    });
-  }, []);
-
-  const handleDeleteSelectedNodes = useCallback(() => {
-    if (selectedNodes.size === 0) return;
-    const newGraphData = {
-        nodes: graphData.nodes.filter(n => !selectedNodes.has(n.id)),
-        links: graphData.links.filter(l => 
-            !selectedNodes.has(typeof l.source === 'string' ? l.source : (l.source as GraphNode).id) && 
-            !selectedNodes.has(typeof l.target === 'string' ? l.target : (l.target as GraphNode).id)
-        )
-    };
-    updateSession(activeSessionId, { graphData: newGraphData });
-    setSelectedNodes(new Set());
-    setToast({ message: `${selectedNodes.size} nodes pruned.`, type: 'cleared' });
-  }, [selectedNodes, graphData, activeSessionId]);
-
-  const handleMergeSelectedNodes = useCallback(() => {
-    setToast({ message: "Merge functionality pending directive.", type: 'info' });
-  }, []);
-  
-  const updateGraphWithAnalysis = useCallback((
-    messageId: string,
-    analysis: UnifiedCognitiveResponse['cognitive_graph']
-  ) => {
-    setSessions(prev => prev.map(session => {
-        if (session.id !== activeSessionId) return session;
-
-        const currentGraph = session.graphData;
-        const newNodes: GraphNode[] = [...currentGraph.nodes];
-        const newLinks: GraphLink[] = [...currentGraph.links];
-        const conceptMap = new Map<string, GraphNode>(
-            currentGraph.nodes.filter(n => n.type === 'concept').map(n => [n.id, n])
-        );
-        const messageNode = newNodes.find(n => n.id === messageId);
-
-        analysis.concepts.forEach(concept => {
-            const conceptId = `concept-${concept.name.toLowerCase().replace(/\s/g, '-')}`;
-            if (!conceptMap.has(conceptId)) {
-                const conceptNode: GraphNode = {
-                    id: conceptId,
-                    label: concept.name.toLowerCase(),
-                    type: 'concept',
-                    size: 6,
-                    weight: concept.weight,
-                    sentiment: concept.sentiment,
-                    x: messageNode?.x || window.innerWidth / 2,
-                    y: (messageNode?.y || window.innerHeight / 2) + 50,
-                    vx: 0, vy: 0
-                };
-                newNodes.push(conceptNode);
-                conceptMap.set(conceptId, conceptNode);
-            }
-            newLinks.push({ source: messageId, target: conceptId, weight: concept.weight });
-        });
-
-        analysis.relationships?.forEach(rel => {
-            const sourceId = `concept-${rel.source.toLowerCase().replace(/\s/g, '-')}`;
-            const targetId = `concept-${rel.target.toLowerCase().replace(/\s/g, '-')}`;
-            if (conceptMap.has(sourceId) && conceptMap.has(targetId)) {
-                const existingLink = newLinks.find(l => 
-                    ((typeof l.source === 'string' ? l.source : l.source.id) === sourceId && (typeof l.target === 'string' ? l.target : l.target.id) === targetId) ||
-                    ((typeof l.source === 'string' ? l.source : l.source.id) === targetId && (typeof l.target === 'string' ? l.target : l.target.id) === sourceId)
-                );
-                if (!existingLink) {
-                   newLinks.push({ source: sourceId, target: targetId, weight: rel.weight });
-                }
-            }
-        });
+        const newSession: ImportedSession = {
+            id: `session_${Date.now()}`,
+            filename: fileName,
+            importedAt: Date.now(),
+            appMode: importedState.appMode,
+            language: importedState.language,
+            versionCount: Array.isArray(importedState.versions) ? importedState.versions.length : 0,
+            projectFileCount: Array.isArray(importedState.projectFiles) ? importedState.projectFiles.length : 0,
+            hasChatHistory: Array.isArray(importedState.chatHistory) && importedState.chatHistory.length > 0,
+            sessionState: importedState,
+        };
         
-        return { ...session, graphData: { nodes: newNodes, links: newLinks } };
-    }));
-  }, [activeSessionId]);
-
-  const handleSendMessage = useCallback(async (messageText: string) => {
-    if (isLoading) return;
-    const text = messageText.trim();
-    if (!text && attachments.length === 0) return;
-
-    setIsLoading(true);
-    setInput('');
-    setSuggestions([]);
-    
-    let userParts: DisplayPart[] = [];
-    if (attachments.length > 0) {
-        attachments.forEach(attachment => {
-            if ('file' in attachment) userParts.push({ inlineData: { mimeType: attachment.mimeType, data: attachment.base64, fileName: attachment.file.name }});
-            if ('url' in attachment) userParts.push({ text: `CONTEXT FROM ${attachment.url}:\n\n${attachment.content}` });
-        });
-        setAttachments([]);
+        setImportedSessions(prev => [newSession, ...prev.filter(s => s.filename !== newSession.filename)]);
+        addToast(`Session "${fileName}" ready to load.`, "success");
+    } catch (err) {
+        const message = err instanceof Error ? err.message : "An unexpected error occurred.";
+        console.error("Failed to import session file:", err);
+        addToast(`Failed to import session: ${message}`, "error");
     }
-    if (text) userParts.push({ text });
-
-    const userMessage: ChatMessageType = { id: uuidv4(), author: Author.USER, parts: userParts };
-    const aiMessageId = uuidv4();
-    const historyBeforeRequest = [...messages];
-    
-    const aiMessageNode: GraphNode = { id: aiMessageId, label: 'ai', type: 'ai', size: 10, weight: 0.5, sentiment: 0, x: 200, y: 200, vx: 0, vy: 0 };
-    const userMessageNode: GraphNode = { id: userMessage.id, label: 'user', type: 'user', size: 10, weight: 0.5, sentiment: 0, x: 200, y: 200, vx: 0, vy: 0 };
-    
-    setSessions(prev => prev.map(s => s.id === activeSessionId ? {
-      ...s,
-      messages: [...s.messages, userMessage, { id: aiMessageId, author: Author.AI, parts: [{ text: '' }] }],
-      graphData: {
-          nodes: [...s.graphData.nodes, userMessageNode, aiMessageNode],
-          links: [...s.graphData.links, { source: userMessage.id, target: aiMessageId, weight: 1 }]
-      }
-    } : s));
-    
-    try {
-      const unifiedResponse = await getUnifiedCognitiveResponse(historyBeforeRequest, userMessage);
-      
-      setSessions(prev => prev.map(s => {
-          if (s.id === activeSessionId) {
-              const updatedMessages = s.messages.map(m => 
-                  m.id === aiMessageId ? { ...m, parts: [{ text: unifiedResponse.response_text }] } : m
-              );
-              return { ...s, messages: updatedMessages, latestAnalysis: unifiedResponse.conversation_analysis };
-          }
-          return s;
-      }));
-
-      updateGraphWithAnalysis(aiMessageId, unifiedResponse.cognitive_graph);
-      if (isSuggestionsEnabled) {
-          setSuggestions(unifiedResponse.prompt_suggestions);
-      }
-    } catch (error) {
-        console.error("Gemini Error:", error);
-        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-        setSessions(prevSessions => prevSessions.map(s => {
-            if (s.id === activeSessionId) {
-                return { ...s, messages: s.messages.map(m => m.id === aiMessageId ? { ...m, parts: [{ text: `Error: ${errorMessage}` }] } : m) };
-            }
-            return s;
-        }));
-    } finally {
-      setIsLoading(false);
-      inputRef.current?.focus();
-    }
-  }, [isLoading, attachments, messages, activeSessionId, updateGraphWithAnalysis, isSuggestionsEnabled]);
-  
-  const handleSaveEdit = useCallback(async (id: string, newText: string) => {
-    const targetIndex = messages.findIndex(msg => msg.id === id);
-    if (targetIndex === -1) return;
-
-    const updatedMessages = messages.map((msg, index) => 
-        index === targetIndex ? { ...msg, parts: [{ text: newText }] } : msg
-    );
-    
-    setEditingMessageId(null);
-    setJustEditedId(id);
-    setTimeout(() => setJustEditedId(null), 1500);
-    
-    const historyToResend = updatedMessages.slice(0, targetIndex + 1);
-    const lastUserMessage = historyToResend[historyToResend.length - 1];
-
-    setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, messages: historyToResend } : s));
-    
-    await handleSendMessage(getTextFromParts(lastUserMessage.parts));
-  }, [messages, handleSendMessage, activeSessionId]);
-  
-  const getTextFromParts = (parts: DisplayPart[]): string => {
-      return parts.filter(p => 'text' in p).map(p => (p as {text: string}).text).join('\n');
   };
   
+<<<<<<< HEAD
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files && files.length > 0) {
@@ -358,26 +226,50 @@ function App() {
                 reader.onloadend = () => resolve({ file, base64: (reader.result as string).split(',')[1], mimeType: file.type });
                 reader.onerror = reject;
                 reader.readAsDataURL(file);
+=======
+  const handleImportFile = (file: File) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const result = e.target?.result as string;
+        if (result) {
+            processImportedSessionFile(result, file.name);
+        }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleDeleteImportedSession = (sessionId: string) => {
+    setImportedSessions(prev => prev.filter(s => s.id !== sessionId));
+    addToast("Imported session removed from list.", "info");
+  };
+
+  const handleShareSession = () => {
+    try {
+        const shareableState = { appMode, language, userOnlyCode, codeB, errorMessage, comparisonGoal, reviewProfile, customReviewProfile };
+        const base64State = btoa(JSON.stringify(shareableState));
+        const url = new URL(window.location.href);
+        url.hash = base64State;
+        
+        navigator.clipboard.writeText(url.toString())
+            .then(() => addToast("Shareable URL copied to clipboard!", "success"))
+            .catch(err => {
+                console.error("Failed to copy URL:", err);
+                addToast("Failed to copy URL to clipboard.", "error");
+>>>>>>> 4869aa7 (updated version 2.8.2)
             });
-        });
-        Promise.all(filePromises).then(newFileAttachments => {
-            setAttachments(prev => [...prev.filter(a => 'file' in a), ...newFileAttachments]);
-            inputRef.current?.focus();
-        });
+    } catch (e) {
+        console.error("Failed to create shareable URL:", e);
+        addToast("Failed to create shareable URL.", "error");
     }
   };
 
-  const handleAttachUrl = (context: UrlContext) => {
-    setAttachments([context]);
-    setIsUrlModalOpen(false);
-    inputRef.current?.focus();
-    setInput(prev => `Based on the attached context, ${prev}`);
-  }
-  
-  const handleRemoveAttachment = (indexToRemove: number) => {
-      setAttachments(prev => prev.filter((_, index) => index !== indexToRemove));
+  const handleSaveChatSession = () => {
+    setIsSavingChat(true);
+    setIsSaveModalOpen(true);
   };
 
+<<<<<<< HEAD
   const handleAutonomousThought = useCallback(async () => {
       setToast({ message: "Autonomous cycle is currently offline.", type: 'info' });
   }, []);
@@ -386,42 +278,50 @@ function App() {
     if (isLoading || !activeSession.latestAnalysis) {
       setToast({ message: "Insufficient data for distillation.", type: 'info' });
       return;
+=======
+  const handleSaveVersion = useCallback(() => {
+    if (!versionName.trim()) {
+        addToast("Version name cannot be empty.", "error");
+        return;
+>>>>>>> 4869aa7 (updated version 2.8.2)
     }
-    setToast({ message: "Distilling core memory from latest analysis...", type: 'info' });
 
-    const systemMessage = { id: `system-${Date.now()}`, author: Author.SYSTEM, parts: [{ text: `[COGNITIVE_DISTILLATION_INITIATED] :: Visualizing latest cognitive summary...` }] };
-    updateSession(activeSessionId, { messages: [...messages, systemMessage] });
+    const newVersion: Version = {
+        id: `version_${Date.now()}`,
+        name: versionName.trim(),
+        userCode: reviewedCode || userOnlyCode,
+        fullPrompt: sessionCtx.fullCodeForReview,
+        feedback: sessionCtx.reviewFeedback || '',
+        language: language,
+        timestamp: Date.now(),
+        type: 'review',
+        rawFeatureMatrixJson: sessionCtx.rawFeatureMatrixJson,
+        reviewProfile: reviewProfile,
+        customReviewProfile: customReviewProfile,
+        comparisonGoal: comparisonGoal,
+        contextFileIds: Array.from(sessionCtx.contextFileIds),
+    };
+
+    if (isSavingChat) {
+        newVersion.chatHistory = sessionCtx.chatHistory;
+        newVersion.feedback = sessionCtx.chatHistory.map(msg => `**${msg.role}**: ${msg.content}`).join('\n\n---\n\n');
+        newVersion.chatRevisions = sessionCtx.chatRevisions;
+        newVersion.chatFiles = sessionCtx.chatFiles;
+    } else if (sessionCtx.outputType) {
+        const typeMap = { 'docs': 'docs', 'tests': 'tests', 'commit': 'commit', 'finalization': 'finalization', 'audit': 'audit', 'root-cause': 'root-cause' };
+        if (typeMap[sessionCtx.outputType]) newVersion.type = typeMap[sessionCtx.outputType] as Version['type'];
+    }
     
-    try {
-      const { summary, key_themes } = activeSession.latestAnalysis;
-      
-      const summaryId = `summary-${Date.now()}`;
-      const newSummaryNode: GraphNode = {
-        id: summaryId, label: "Core Memory", type: 'summary', size: 15, weight: 1.0, sentiment: 0,
-        summaryText: summary, x: window.innerWidth / 4, y: window.innerHeight / 4, vx: 0, vy: 0,
-      };
-
-      const newThemeNodes: GraphNode[] = key_themes.map((theme, i) => ({
-        id: `concept-${theme.toLowerCase().replace(/\s/g, '-')}-${Date.now()}`, label: theme.toLowerCase(), type: 'concept',
-        size: 8, weight: 0.8, sentiment: 0,
-        x: window.innerWidth / 4 + (Math.cos(i / key_themes.length * 2 * Math.PI) * 100),
-        y: window.innerHeight / 4 + (Math.sin(i / key_themes.length * 2 * Math.PI) * 100),
-        vx: 0, vy: 0,
-      }));
-
-      const newLinks = newThemeNodes.map(themeNode => ({ source: summaryId, target: themeNode.id, weight: 0.8 }));
-
-      updateSession(activeSessionId, {
-        graphData: { nodes: [...graphData.nodes, newSummaryNode, ...newThemeNodes], links: [...graphData.links, ...newLinks] }
-      });
-      setToast({ message: "Distillation complete. Core memory node synthesized.", type: 'success' });
-    } catch(e) {
-      console.error("Distill memory error:", e);
-      setToast({ message: "Distillation failed.", type: 'cleared' });
-      const errorMessage = e instanceof Error ? e.message : "An unknown error occurred.";
-      const errorSysMessage = { id: `system-${Date.now()}`, author: Author.SYSTEM, parts: [{ text: `[COGNitive_DISTILLATION_FAILED] :: ${errorMessage}` }] };
-      updateSession(activeSessionId, { messages: [...messages, errorSysMessage] });
+    setVersions(prev => [newVersion, ...prev]);
+    addToast(`Version "${versionName.trim()}" saved!`, "success");
+    setIsSaveModalOpen(false);
+    setVersionName('');
+    
+    if (isSavingChat) {
+        setIsSavingChat(false);
+        sessionCtx.resetForNewRequest();
     }
+<<<<<<< HEAD
   }, [isLoading, messages, graphData, activeSessionId, activeSession?.latestAnalysis]);
 
   const handleDraftCounterMeasure = useCallback(() => {
@@ -440,18 +340,184 @@ function App() {
   if (!isInitialized) {
     return <SplashScreen onFinished={() => setIsInitialized(true)} />;
   }
+=======
+  }, [versionName, isSavingChat, language, addToast, setVersions, sessionCtx, userOnlyCode, reviewedCode, reviewProfile, customReviewProfile, comparisonGoal]);
+>>>>>>> 4869aa7 (updated version 2.8.2)
   
-  const confirmationModalProps = () => {
-    if (!deleteCandidate) return { isOpen: false, title: '', bodyText: '' };
-    switch(deleteCandidate.type) {
-        case 'memory-wipe': return { isOpen: true, title: "Confirm Memory Wipe", bodyText: "This will permanently erase ALL cognitive sessions from browser storage and reset the session. This action cannot be undone.", confirmText: "Wipe & Reset" };
-        case 'session': return { isOpen: true, title: "Confirm Session Deletion", bodyText: `Are you sure you want to delete the session "${sessions.find(s => s.id === deleteCandidate.id)?.name}"? This is irreversible.`, confirmText: "Delete Session" };
-        case 'message': return { isOpen: true, title: "Confirm Deletion", bodyText: "This will delete the selected message and its subsequent AI response, altering the conversational context. This action cannot be undone.", confirmText: "Delete & Proceed" };
+  const handleLoadVersion = (version: Version) => {
+    addToast(`Loading version "${version.name}"...`, "info");
+    handleLoadSession(version); // Use the logic from the context
+    setIsVersionHistoryModalOpen(false);
+  };
+
+  const handleDeleteVersion = (versionId: string) => {
+      setVersions(prev => prev.filter(v => v.id !== versionId));
+      addToast("Version deleted.", "info");
+  };
+
+  const handleRenameVersion = (versionId: string, newName:string) => {
+      setVersions(prev => prev.map(v => v.id === versionId ? { ...v, name: newName } : v));
+      addToast("Version renamed.", "success");
+  };
+
+    const fileToContent = (file: File): Promise<{ content: string; mimeType: string }> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const result = reader.result as string;
+                if (file.type.startsWith('image/')) {
+                    resolve({ content: result.split(',')[1], mimeType: file.type });
+                } else {
+                    resolve({ content: result, mimeType: file.type || 'text/plain' });
+                }
+            };
+            reader.onerror = (error) => reject(error);
+            if (file.type.startsWith('image/')) reader.readAsDataURL(file);
+            else reader.readAsText(file);
+        });
+    };
+
+    const handleAttachmentsChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = event.target.files;
+        if (!files) return;
+        try {
+            const newAttachments = await Promise.all(
+                Array.from(files).map(async (file: File) => {
+                    const { content, mimeType } = await fileToContent(file);
+                    return { file, content, mimeType };
+                })
+            );
+            sessionCtx.setAttachments(prev => [...prev, ...newAttachments]);
+            addToast(`${newAttachments.length} file(s) attached to chat.`, "info");
+        } catch (error) {
+            console.error("Failed to read attachments:", error);
+            addToast("Failed to read one or more files.", "error");
+        }
+    };
+  
+    const handleUploadProjectFile = async (file: File) => {
+        try {
+            const { content, mimeType } = await fileToContent(file);
+            setProjectFiles(prev => [{ id: `proj_${Date.now()}_${file.name}`, name: file.name, content, mimeType, timestamp: Date.now() }, ...prev]);
+            addToast(`File "${file.name}" uploaded to project.`, "success");
+        } catch (error) {
+            console.error("Failed to upload project file:", error);
+            addToast("Failed to upload file.", "error");
+        }
+    };
+  
+    const handleDeleteProjectFile = (fileId: string) => {
+        setProjectFiles(prev => prev.filter(pf => pf.id !== fileId));
+        addToast("Project file deleted.", "info");
+    };
+
+    const handleDownloadProjectFile = async (content: string, filename: string, mimeType: string) => {
+        try {
+            let blob: Blob;
+            if (mimeType.startsWith('image/')) {
+                const response = await fetch(`data:${mimeType};base64,${content}`);
+                blob = await response.blob();
+            } else {
+                blob = new Blob([content], { type: mimeType });
+            }
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error("Failed to download file:", error);
+            addToast("Failed to download file.", "error");
+        }
+    };
+
+    const handleAttachProjectFileToChat = async (projectFile: ProjectFile) => {
+        try {
+            let blob: Blob;
+            if (projectFile.mimeType.startsWith('image/')) {
+                const response = await fetch(`data:${projectFile.mimeType};base64,${projectFile.content}`);
+                blob = await response.blob();
+            } else {
+                blob = new Blob([projectFile.content], { type: projectFile.mimeType });
+            }
+            const file = new File([blob], projectFile.name, { type: projectFile.mimeType });
+            sessionCtx.setAttachments(prev => [...prev, { file: file, content: projectFile.content, mimeType: projectFile.mimeType }]);
+            addToast(`Attached "${projectFile.name}" to chat.`, "success");
+            setIsProjectFilesModalOpen(false);
+        } catch (error) {
+            console.error("Failed to attach project file:", error);
+            addToast("Failed to attach project file.", "error");
+        }
+    };
+      
+    const handleDownloadFile = (content: string, filename: string) => {
+        if (!content) return;
+        const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        addToast(`Downloaded "${filename}".`, "success");
+    };
+
+    const handleLaunchRecon = (url: string) => {
+        setIsThreatVectorModalOpen(false);
+        setTargetHostname(url);
+        setIsReconModalOpen(true);
+    };
+
+    const handleStageExploit = (endpoint?: string) => {
+        setInitialExploitEndpoint(endpoint || '');
+        setIsThreatVectorModalOpen(false);
+        setIsExploitStagerModalOpen(true);
+    };
+
+    const handleDraftReport = (reportContent: string) => {
+        setInitialAdversarialContext(reportContent);
+        setIsThreatVectorModalOpen(false);
+        setIsReportGeneratorModalOpen(true);
+    };
+
+  const renderInputComponent = () => {
+    const commonProps = {
+      isActive: activePanel === 'input',
+    };
+
+    const chatHandlers = {
+      onAttachFileClick: () => attachFileInputRef.current?.click(),
+      onOpenProjectFilesModal: () => setIsProjectFilesModalOpen(true),
+    };
+
+    switch(appMode) {
+      case 'single':
+      case 'debug':
+        return <CodeInput 
+          {...commonProps}
+          {...chatHandlers}
+          onOpenSaveModal={() => setIsSaveModalOpen(true)}
+          onSaveChatSession={handleSaveChatSession}
+        />;
+      case 'comparison':
+        return <ComparisonInput 
+          {...commonProps}
+          {...chatHandlers}
+        />;
+      case 'audit':
+        return <AuditInput {...commonProps} />;
+      default:
+        return null;
     }
-    return { isOpen: false, title: '', bodyText: '' };
   }
 
   return (
+<<<<<<< HEAD
     <div className="main-frame">
         <div className="scanline-overlay"></div>
         <Header 
@@ -485,71 +551,163 @@ function App() {
                     onToggleEditMode={handleToggleEditMode}
                     onDeleteSelected={handleDeleteSelectedNodes}
                     onMergeSelected={handleMergeSelectedNodes}
+=======
+    <div className="h-screen flex flex-col relative">
+      <div className="fixed top-1/4 left-8 w-1/4 h-px bg-[var(--hud-color-darker)] opacity-50"></div>
+      <div className="fixed bottom-1/4 right-8 w-1/4 h-px bg-[var(--hud-color-darker)] opacity-50"></div>
+      <div className="fixed top-1/2 right-12 w-px h-1/4 bg-[var(--hud-color-darker)] opacity-50"></div>
+      <div className="fixed bottom-1/3 left-12 w-px h-1/4 bg-[var(--hud-color-darker)] opacity-50"></div>
+
+      <Header 
+        isToolsEnabled={userOnlyCode.trim() !== '' && !isChatMode && (appMode === 'single' || appMode === 'debug')}
+        onOpenDocsModal={() => setIsDocsModalOpen(true)}
+        onOpenProjectFilesModal={() => setIsProjectFilesModalOpen(true)}
+        onToggleVersionHistory={() => setIsVersionHistoryModalOpen(true)}
+        onOpenReportGenerator={() => setIsReportGeneratorModalOpen(true)}
+        onOpenReconModal={() => setIsReconModalOpen(true)}
+        onOpenExploitStagerModal={handleStageExploit}
+        onOpenThreatVectorModal={() => setIsThreatVectorModalOpen(true)}
+        onExportSession={handleExportSession}
+        onImportClick={() => setIsSessionManagerModalOpen(true)}
+        onShare={handleShareSession}
+        onEndChatSession={handleSaveChatSession}
+      />
+      <ApiKeyBanner />
+      <SegmentedControl
+        currentMode={appMode}
+        onModeChange={resetAndSetMode}
+        disabled={isLoading || isChatLoading}
+      />
+      <main className={`flex-grow container mx-auto px-4 pb-4 sm:px-6 sm:pb-6 lg:px-8 lg:pb-8 grid grid-cols-1 ${isInputPanelVisible && showOutputPanel && !isChatMode ? 'md:grid-cols-2' : ''} gap-6 lg:gap-8 animate-fade-in overflow-hidden`}>
+          {isInputPanelVisible && (
+            <div className={`min-h-0 ${isChatMode ? 'md:col-span-2' : ''}`} onClick={() => !isChatMode && setActivePanel('input')}>
+              {renderInputComponent()}
+            </div>
+          )}
+          
+          {showOutputPanel && !isChatMode && (
+            <div className="min-h-0" onClick={() => setActivePanel('output')}>
+                <ReviewOutput
+                  onSaveVersion={() => setIsSaveModalOpen(true)}
+                  onShowDiff={() => setIsDiffModalOpen(true)}
+                  isActive={activePanel === 'output'}
+>>>>>>> 4869aa7 (updated version 2.8.2)
                 />
             </div>
-            <div className="chat-workspace">
-                <div className="chat-container flex-1 overflow-y-auto p-4" ref={chatListRef}>
-                    <div className="space-y-6">
-                        {messages.map((message, index) => (
-                          <ChatMessage
-                            key={message.id}
-                            message={message}
-                            isEditing={editingMessageId === message.id}
-                            justEditedId={justEditedId}
-                            onStartEdit={() => setEditingMessageId(message.id)}
-                            onCancelEdit={() => setEditingMessageId(null)}
-                            onSaveEdit={handleSaveEdit}
-                            isLastMessage={index === messages.length - 1}
-                            isLoading={isLoading}
-                            onDelete={() => setDeleteCandidate({type: 'message', id: message.id})}
-                          />
-                        ))}
-                    </div>
-                </div>
-                <div className="input-panel">
-                    <PromptSuggestions 
-                        suggestions={suggestions} 
-                        isLoading={isLoading} 
-                        onSelect={(s) => handleSendMessage(s)}
-                    />
-                    <ChatInput
-                        ref={inputRef}
-                        input={input}
-                        setInput={setInput}
-                        onSendMessage={handleSendMessage}
-                        isLoading={isLoading}
-                        maxLength={MAX_INPUT_LENGTH}
-                        onOpenUrlModal={() => setIsUrlModalOpen(true)}
-                        onFileChange={handleFileChange}
-                        attachments={attachments}
-                        onRemoveAttachment={handleRemoveAttachment}
-                        isAutoScrollEnabled={isAutoScrollEnabled}
-                        onToggleAutoScroll={() => setIsAutoScrollEnabled(p => !p)}
-                        isSuggestionsEnabled={isSuggestionsEnabled}
-                        onToggleSuggestions={() => setIsSuggestionsEnabled(p => !p)}
-                        onAutonomousThought={handleAutonomousThought}
-                        onDistillMemory={handleDistillMemory}
-                    />
-                </div>
-            </div>
-        </div>
-
-        <UrlInputModal 
-            isOpen={isUrlModalOpen}
-            onClose={() => setIsUrlModalOpen(false)}
-            onAttach={handleAttachUrl}
-        />
-        <ChangelogModal 
-            isOpen={isChangelogModalOpen}
-            onClose={() => setIsChangelogModalOpen(false)}
-        />
-        <ConfirmationModal
-            {...confirmationModalProps()}
-            onClose={() => setDeleteCandidate(null)}
-            onConfirm={handleDelete}
-        />
+          )}
+      </main>
+      <footer className="py-4 text-center">
+          <div className="flex justify-center items-center space-x-6 text-xs text-[var(--hud-color-darker)]">
+            <span>4ndr0⫌ebugger &copy; 2025</span>
+          </div>
+          <input type="file" ref={attachFileInputRef} style={{ display: 'none' }} multiple onChange={handleAttachmentsChange} />
+      </footer>
+      {isDiffModalOpen && reviewedCode && revisedCode && (
+          <DiffViewer 
+              oldCode={reviewedCode}
+              newCode={revisedCode}
+              language={language}
+              onClose={() => setIsDiffModalOpen(false)}
+          />
+      )}
+      {isSaveModalOpen && (
+          <SaveVersionModal
+              isOpen={isSaveModalOpen}
+              onClose={() => setIsSaveModalOpen(false)}
+              onSave={handleSaveVersion}
+              versionName={versionName}
+              setVersionName={setVersionName}
+              onAutoGenerate={async () => {
+                setIsGeneratingName(true);
+                await sessionCtx.handleAutoGenerateVersionName(isSavingChat, setVersionName);
+                setIsGeneratingName(false);
+              }}
+              isGeneratingName={isGeneratingName}
+              outputType={sessionCtx.outputType}
+              isSavingChat={isSavingChat}
+              disabled={isLoading}
+          />
+      )}
+      <VersionHistoryModal 
+        isOpen={isVersionHistoryModalOpen}
+        onClose={() => setIsVersionHistoryModalOpen(false)}
+        onLoadVersion={handleLoadVersion}
+        onDeleteVersion={handleDeleteVersion}
+        onRenameVersion={handleRenameVersion}
+        onStartFollowUp={(v) => { handleStartFollowUp(v); setIsVersionHistoryModalOpen(false); }}
+        isLoading={isLoading}
+      />
+       <DocumentationCenterModal
+        isOpen={isDocsModalOpen}
+        onClose={() => setIsDocsModalOpen(false)}
+        onLoadVersion={handleLoadVersion}
+        onDeleteVersion={handleDeleteVersion}
+        onDownload={handleDownloadFile}
+        isLoading={isLoading}
+      />
+      <ProjectFilesModal
+        isOpen={isProjectFilesModalOpen}
+        onClose={() => setIsProjectFilesModalOpen(false)}
+        onUploadFile={handleUploadProjectFile}
+        onDeleteFile={handleDeleteProjectFile}
+        onAttachFile={handleAttachProjectFileToChat}
+        onDownloadFile={handleDownloadProjectFile}
+        isLoading={isLoading}
+      />
+      <SessionManagerModal
+        isOpen={isSessionManagerModalOpen}
+        onClose={() => setIsSessionManagerModalOpen(false)}
+        onImportFile={handleImportFile}
+        onLoadSession={(state) => { handleLoadSession(state); setIsSessionManagerModalOpen(false); }}
+        onDeleteSession={handleDeleteImportedSession}
+        isLoading={isLoading}
+      />
+      <AdversarialReportGenerator
+        isOpen={isReportGeneratorModalOpen}
+        onClose={() => {
+            setIsReportGeneratorModalOpen(false);
+            sessionCtx.setAdversarialReportContent(null);
+            setInitialAdversarialContext(null);
+        }}
+        onGenerate={handleGenerateAdversarialReport}
+        isLoading={sessionCtx.isGeneratingReport || isLoading}
+        reportContent={sessionCtx.adversarialReportContent}
+        initialContext={initialAdversarialContext}
+      />
+      <LiveReconModal
+        isOpen={isReconModalOpen}
+        onClose={() => setIsReconModalOpen(false)}
+      />
+      <ExploitStagerModal
+        isOpen={isExploitStagerModalOpen}
+        onClose={() => setIsExploitStagerModalOpen(false)}
+        initialEndpoint={initialExploitEndpoint}
+      />
+      <ThreatVectorModal
+        isOpen={isThreatVectorModalOpen}
+        onClose={() => setIsThreatVectorModalOpen(false)}
+        onLaunchRecon={handleLaunchRecon}
+        onStageExploit={handleStageExploit}
+        onDraftReport={handleDraftReport}
+      />
     </div>
   );
-}
+};
+
+// The main App component now simply provides the context and renders the controller.
+const App: React.FC = () => {
+  const [resetCount, setResetCount] = useState(0);
+  const handleReset = () => {
+    setResetCount(c => c + 1);
+  };
+
+  return (
+    <AppContextProvider onReset={handleReset}>
+      <SessionProvider key={resetCount}>
+        <AppController />
+      </SessionProvider>
+    </AppContextProvider>
+  );
+};
 
 export default App;
